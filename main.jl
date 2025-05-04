@@ -22,8 +22,25 @@ using Gmsh, LinearAlgebra, SparseArrays
 include("gmsh_wrapper.jl")
 
 # For plots | Uncomment the plot section of "main()"
-# using GLMakie
+using GLMakie
 
+function viewMesh(mesh)
+    fig = Figure()
+    ax = Axis3(fig[1, 1], aspect=:equal, title="")
+    
+    # Convert surface triangles to Makie format
+    faces = [GLMakie.GLTriangleFace(mesh.surfaceT[1,i], 
+                                    mesh.surfaceT[2,i], 
+                                    mesh.surfaceT[3,i]) for i in 1:size(mesh.surfaceT,2)]
+    
+    # Create mesh plot using surface triangles
+    mesh!(ax, mesh.p', faces,
+            color=:lightblue,
+            transparency=true,
+            alpha=0.3)
+
+    display(fig)
+end
 
 # FEM linear basis function
 function abcd(p::Matrix{Float64},nodes::Vector{Int32},nd::Int32)
@@ -203,6 +220,9 @@ function main(meshSize=0,localSize=0,showGmsh=true,saveMesh=false)
     println("Number of Inside nodes ",length(mesh.InsideNodes))
     println("Number of surface elements ",size(mesh.surfaceT,2))
 
+    # View the mesh using Julia instead of Gmsh
+    viewMesh(mesh)
+
     # FEM
 
     # Relative magnetic permeability 
@@ -273,32 +293,48 @@ function main(meshSize=0,localSize=0,showGmsh=true,saveMesh=false)
     end
 
     # Element centroids
-    centroids::Matrix{Float64} = zeros(3,mesh.nt)
+    centroids::Matrix{Float64} = zeros(mesh.nt,3)
     for k in 1:mesh.nt
         nds = mesh.t[:,k]
-        centroids[1,k] = sum(mesh.p[1,nds])/4
-        centroids[2,k] = sum(mesh.p[2,nds])/4
-        centroids[3,k] = sum(mesh.p[3,nds])/4
+        centroids[k,1] = sum(mesh.p[1,nds])/4
+        centroids[k,2] = sum(mesh.p[2,nds])/4
+        centroids[k,3] = sum(mesh.p[3,nds])/4
     end
 
-    # Plot result | Uncomment "using GLMakie"
-    # fig = Figure()
-    # ax = Axis3(fig[1, 1], aspect = :equal, title="Magnetic field H")
-    # scatterPlot = scatter!(ax, 
-    #     centroids[1,mesh.InsideElements],
-    #     centroids[2,mesh.InsideElements],
-    #     centroids[3,mesh.InsideElements], 
-    #     color = H[mesh.InsideElements], 
-    #     colormap=:rainbow, 
-    #     markersize=20 .* mesh.VE[mesh.InsideElements]./maximum(mesh.VE[mesh.InsideElements]))
 
-    # Colorbar(fig[1, 2], scatterPlot, label="H field strength") # Add a colorbar
-    
+    # Plot result | Uncomment "using GLMakie"
+    fig = Figure()
+    ax = Axis3(fig[1, 1], aspect = :equal, title="Magnetic field H")
+
+    # Add |H|
+    scatterPlot = scatter!(ax, 
+        centroids[mesh.InsideElements,1],
+        centroids[mesh.InsideElements,2],
+        centroids[mesh.InsideElements,3], 
+        color = H[mesh.InsideElements], 
+        colormap=:rainbow, 
+        markersize=20 .* mesh.VE[mesh.InsideElements]./maximum(mesh.VE[mesh.InsideElements]))
+
+    # Add vector plot
+    # plt = arrows!(ax, 
+    #     centroids[mesh.InsideElements,1],
+    #     centroids[mesh.InsideElements,2],
+    #     centroids[mesh.InsideElements,3], 
+    #     H_vectorField[mesh.InsideElements,1],
+    #     H_vectorField[mesh.InsideElements,2],
+    #     H_vectorField[mesh.InsideElements,3],
+    #     arrowcolor = H[mesh.InsideElements],
+    #     arrowsize = 0.1,
+    #     normalize = false)
+
+    # Add colorbar
+    Colorbar(fig[1, 2], scatterPlot, label="H field strength") # Add a colorbar
+
+
     # # Display the figure (this will open an interactive window)
-    # display(fig) # This is required only if runing outside the repl
+    display(fig) # This is required only if runing outside the repl
+    sleep(10)    # Pause for 10 seconds before the terminal is closed
     
-    # sleep(10)    # Pause for 10 seconds before the terminal is closed
-    #              # This is required only if runing outside the repl
     # save("H.png",fig)
 
 end # end of main
