@@ -4,6 +4,10 @@ The philosophy of this repository is to serve as a kickstart to anyone who wants
 Here is a direct output of main(), the internal magnetic field of a sphere under a uniform magnetic field.
 ![magneticfield_example](https://github.com/user-attachments/assets/86fc8c7c-7e8a-4f6b-a807-0df6720f1a1b)
 
+And here is the magnetic field of a plate aligned with the aplied field. Both of these geometries were created with simple commands.
+![H_plate](https://github.com/user-attachments/assets/0b03a7a4-1872-4402-a10f-1654ce149a1f)
+
+
 ## Functionality
 Make a high quality 3D mesh of your 3D model and get all the properties you need, easily accessible in a simple MESH() object, powered by Gmsh. Make a local refinement of your model, based on the volume ID, or just set a target mesh size.
 
