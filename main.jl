@@ -190,8 +190,10 @@ function main(meshSize=0,localSize=0,showGmsh=true,saveMesh=false)
     # List of cells inside the container
     cells = []
 
-    # Add 1st sphere
-    addSphere([0,0,0],0.5,cells)
+    # Add another object inside the container
+    # addSphere([0,0,0],0.5,cells)
+    addCuboid([0,0,0],[1.65,1.65,0.04],cells,true)
+
 
     # Fragment to make a unified geometry
     _, fragments = gmsh.model.occ.fragment([(3, box)], cells)
@@ -304,7 +306,7 @@ function main(meshSize=0,localSize=0,showGmsh=true,saveMesh=false)
 
     # Plot result | Uncomment "using GLMakie"
     fig = Figure()
-    ax = Axis3(fig[1, 1], aspect = :equal, title="Magnetic field H")
+    ax = Axis3(fig[1, 1], aspect = :data, title="Magnetic field H")
 
     # Add |H|
     scatterPlot = scatter!(ax, 
@@ -333,9 +335,9 @@ function main(meshSize=0,localSize=0,showGmsh=true,saveMesh=false)
 
     # # Display the figure (this will open an interactive window)
     display(fig) # This is required only if runing outside the repl
-    sleep(10)    # Pause for 10 seconds before the terminal is closed
+    sleep(30)    # Pause for x seconds before the terminal is closed
     
-    # save("H.png",fig)
+    save("H.png",fig)
 
 end # end of main
 
