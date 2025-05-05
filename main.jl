@@ -44,7 +44,7 @@ function viewMesh(mesh)
 end # View the mesh using Makie
 
 # Scatter plot of magnetic field
-function plotHField(mesh,centroids::Matrix{Float64},H::Vector{Float64})
+function plotHField(mesh,centroids::Matrix{Float64},H::Vector{Float64},saveFigure)
     fig = Figure()
     ax = Axis3(fig[1, 1], aspect = :data, title="Magnetic field H")
 
@@ -65,6 +65,12 @@ function plotHField(mesh,centroids::Matrix{Float64},H::Vector{Float64})
     while isopen(screen)
         sleep(0.1)
     end
+
+    # Save figure
+    if saveFigure
+        save("H.png",fig)
+    end
+
 end # Scatter plot of magnetic field
 
 # FEM linear basis function
@@ -316,10 +322,7 @@ function main(meshSize=0,localSize=0,showGmsh=true,saveMesh=false)
     end
 
     # Plot result | Uncomment "using GLMakie"
-    plotHField(mesh,centroids,H)
-    
-    # Save figure
-    # save("H.png",fig)
+    plotHField(mesh,centroids,H,true)
 
 end # end of main
 
