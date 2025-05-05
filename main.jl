@@ -24,6 +24,7 @@ include("gmsh_wrapper.jl")
 # For plots | Uncomment the plot section of "main()"
 using GLMakie
 
+# View the mesh processed by FEMjl, generated with gmsh, using Makie
 function viewMesh(mesh)
     fig = Figure()
     ax = Axis3(fig[1, 1], aspect=:equal, title="")
@@ -40,7 +41,7 @@ function viewMesh(mesh)
             alpha=0.3)
 
     display(fig)
-end
+end # View the mesh using Makie
 
 # FEM linear basis function
 function abcd(p::Matrix{Float64},nodes::Vector{Int32},nd::Int32)
@@ -56,7 +57,7 @@ function abcd(p::Matrix{Float64},nodes::Vector{Int32},nd::Int32)
 
     r::Vector{Float64} = M\[1;0;0;0]
 
-    return r[1],r[2],r[3],r[4] # a b c d
+    return r[1],r[2],r[3],r[4] # f= a + bx + cy + dz
 end # Basis function coef.
 
 # Sparse, global stiffness matrix
@@ -64,20 +65,7 @@ function stiffnessMatrix(mesh,f::Vector{Float64})
     A = spzeros(mesh.nv,mesh.nv)
 
     # Local stiffness matrix
-    Ak::Matrix{Float64} = zeros(4*4,mesh.nt)
-    b::Vector{Float64} = zeros(4)
-    c::Vector{Float64} = zeros(4)
-    d::Vector{Float64} = zeros(4)
-    aux::Matrix{Float64} = zeros(4,4)
-    
-    for k in 1:mesh.nt
-        for i in 1:4
-            _,b[i],c[i],d[i] = abcd(mesh.p,mesh.t[:,k],mesh.t[i,k])
-        end
-        aux = mesh.VE[k]*f[k]*(b*b' + c*c' + d*d')
-        Ak[:,k] = aux[:] # vec(aux)
-    end
-    # Local stiffness matrix
+    Ak::Matrix{Float64} = localStiffnessMatrix(mesh,f)
 
     # Update sparse global matrix
     n = 0
@@ -110,7 +98,7 @@ function BoundaryIntegral(mesh,F,shell_id)
     RHS = zeros(mesh.nv,1);
     for s in 1:mesh.ne
 
-        # Only integrate over the outer shell
+        # Only integrate over the desired elements
         if !(mesh.surfaceT[4,s] in shell_id)
             continue
         end
@@ -172,7 +160,6 @@ function main(meshSize=0,localSize=0,showGmsh=true,saveMesh=false)
 
     =#
     
-
     # Applied field
     mu0 = pi*4e-7      # vacuum magnetic permeability
     Hext = [1,0,0]     # T
@@ -258,7 +245,7 @@ function main(meshSize=0,localSize=0,showGmsh=true,saveMesh=false)
     
     =#
 
-    # Magnetic field
+    # Magnetic field | Normalized by mu0 -> H_true = H/mu0
     H_vectorField::Matrix{Float64} = zeros(mesh.nt,3)
     for k in 1:mesh.nt
         nds = mesh.t[:,k];
@@ -303,7 +290,6 @@ function main(meshSize=0,localSize=0,showGmsh=true,saveMesh=false)
         centroids[k,3] = sum(mesh.p[3,nds])/4
     end
 
-
     # Plot result | Uncomment "using GLMakie"
     fig = Figure()
     ax = Axis3(fig[1, 1], aspect = :data, title="Magnetic field H")
@@ -330,14 +316,17 @@ function main(meshSize=0,localSize=0,showGmsh=true,saveMesh=false)
     #     normalize = false)
 
     # Add colorbar
-    Colorbar(fig[1, 2], scatterPlot, label="H field strength") # Add a colorbar
+    Colorbar(fig[1, 2], scatterPlot, label="H field strength")
 
-
-    # # Display the figure (this will open an interactive window)
-    display(fig) # This is required only if runing outside the repl
-    sleep(30)    # Pause for x seconds before the terminal is closed
+    screen = GLMakie.Screen()
+    display(screen,fig)
+    # Get the current active screen and wait for it to close
+    while isopen(screen)
+        sleep(0.1)
+    end
     
-    save("H.png",fig)
+    # Save figure
+    # save("H.png",fig)
 
 end # end of main
 
