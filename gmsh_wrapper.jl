@@ -109,9 +109,14 @@ function makeContainer(scale=5)
         z_max = max(z_max, bb[6])
     end
 
+    Lx = x_max-x_min
+    Ly = y_max-y_min
+    Lz = z_max-z_min
+    L = maximum([Lx,Ly,Lz])
+
     # Container position and dimensions
     center = [(x_min + x_max)/2, (y_min + y_max)/2, (z_min + z_max)/2]
-    dimensions = scale*[x_max - x_min, y_max - y_min, z_max - z_min]
+    dimensions = scale*[L,L,L]
 
     box = addCuboid(center,dimensions)
 
