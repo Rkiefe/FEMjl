@@ -7,7 +7,6 @@ Here is a direct output of main(), the internal magnetic field of a plate aligne
 And now for a sphere. Both of these geometries were created with simple commands.
 ![magneticfield_example](https://github.com/user-attachments/assets/86fc8c7c-7e8a-4f6b-a807-0df6720f1a1b)
 
-
 ## Functionality
 Make a high quality 3D mesh of your 3D model and get all the properties you need, easily accessible in a simple MESH() object, powered by Gmsh. Make a local refinement of your model, based on the volume ID, or just set a target mesh size.
 
