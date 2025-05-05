@@ -320,7 +320,6 @@ function main(meshSize=0,localSize=0,showGmsh=true,saveMesh=false)
 
     screen = GLMakie.Screen()
     display(screen,fig)
-    # Get the current active screen and wait for it to close
     while isopen(screen)
         sleep(0.1)
     end
