@@ -40,7 +40,12 @@ function viewMesh(mesh)
             transparency=true,
             alpha=0.3)
 
-    display(fig)
+    screen = GLMakie.Screen()
+    display(screen,fig)
+    while isopen(screen)
+        sleep(0.1)
+    end
+    
 end # View the mesh using Makie
 
 # Scatter plot of magnetic field
@@ -70,7 +75,6 @@ function plotHField(mesh,centroids::Matrix{Float64},H::Vector{Float64},saveFigur
     if saveFigure
         save("H.png",fig)
     end
-
 end # Scatter plot of magnetic field
 
 # FEM linear basis function
@@ -182,22 +186,9 @@ end # Local stiffnessmatrix in 100% Julia
 
 function main(meshSize=0,localSize=0,showGmsh=true,saveMesh=false)
     #=
-        Makes a model with cubes and spheres and refines the mesh on the spheres
-    
-        Input:
-            meshSize  - Mesh size (0 = let gmsh choose)
-            localSize - Size of mesh in every volume beyond the container (0 for no local refinement)
-            saveMesh  - Save mesh to a FEMCE compatible format 
-
+        An example of creating your own model with simple shapes
     =#
     
-    # Applied field
-    mu0 = pi*4e-7      # vacuum magnetic permeability
-    Hext = [1,0,0]     # T
-    
-    # Relative magnetic permeability
-    permeability::Float64 = 3
-
     # Create a geometry
     gmsh.initialize()
 
@@ -209,9 +200,9 @@ function main(meshSize=0,localSize=0,showGmsh=true,saveMesh=false)
     cells = []
 
     # Add another object inside the container
+    
     # addSphere([0,0,0],0.5,cells)
     addCuboid([0,0,0],[1.65,1.65,0.04],cells,true)
-
 
     # Fragment to make a unified geometry
     _, fragments = gmsh.model.occ.fragment([(3, box)], cells)
@@ -242,87 +233,6 @@ function main(meshSize=0,localSize=0,showGmsh=true,saveMesh=false)
 
     # View the mesh using Julia instead of Gmsh
     viewMesh(mesh)
-
-    # FEM
-
-    # Relative magnetic permeability 
-    mu::Vector{Float64} = ones(mesh.nt);
-    mu[mesh.InsideElements] .= permeability
-
-    # Boundary conditions
-    RHS = BoundaryIntegral(mesh,Hext,shell_id)
-
-    # Lagrange multiplier technique
-    Lag = lagrange(mesh)
-
-    # Stiffness matrix
-    A = @time stiffnessMatrix(mesh,mu) 
-    
-    # Extend the matrix for the Lagrange multiplier technique
-    mat = [A Lag;Lag' 0]
-
-    # Magnetic scalar potential
-    u = mat\[-RHS;0]
-    u = u[1:mesh.nv]
-
-    #= Example of calling C++ to calculate the local stiffness matrix
-        
-        # Julia local stiffness matrix
-        Ak::Matrix{Float64} = @time localStiffnessMatrix(mesh,mu)
-
-        # C++ Local stiffness matrix
-        @. mesh.t -= 1 # C++ index starts at 0
-        Ak::Matrix{Float64} = @time CstiffnessMatrix(mesh.p,mesh.t,mesh.VE,mu)
-    
-    =#
-
-    # Magnetic field | Normalized by mu0 -> H_true = H/mu0
-    H_vectorField::Matrix{Float64} = zeros(mesh.nt,3)
-    for k in 1:mesh.nt
-        nds = mesh.t[:,k];
-
-        # Sum the contributions
-        for nd in nds
-            # obtain the element parameters
-            _,b,c,d = abcd(mesh.p,nds,nd)
-
-            H_vectorField[k,1] = H_vectorField[k,1] - u[nd]*b;
-            H_vectorField[k,2] = H_vectorField[k,2] - u[nd]*c;
-            H_vectorField[k,3] = H_vectorField[k,3] - u[nd]*d;
-        end
-    end
-
-    # Magnetic field intensity
-    H::Vector{Float64} = zeros(mesh.nt)
-    for k in 1:mesh.nt
-        H[k] = sqrt(H_vectorField[k,1]^2+H_vectorField[k,2]^2+H_vectorField[k,3]^2)
-    end
-
-    # Magnetization
-    chi::Vector{Float64} = mu .- 1;
-    M_vectorField::Matrix{Float64} = zeros(mesh.nInside,3)
-    M::Vector{Float64} = zeros(mesh.nInside)
-    for ik in 1:mesh.nInside
-        k = mesh.InsideElements[ik]
-        
-        M_vectorField[ik,1] = chi[k]*H_vectorField[k,1]
-        M_vectorField[ik,2] = chi[k]*H_vectorField[k,2]
-        M_vectorField[ik,3] = chi[k]*H_vectorField[k,3]
-
-        M[ik] = chi[k]*H[k]
-    end
-
-    # Element centroids
-    centroids::Matrix{Float64} = zeros(mesh.nt,3)
-    for k in 1:mesh.nt
-        nds = mesh.t[:,k]
-        centroids[k,1] = sum(mesh.p[1,nds])/4
-        centroids[k,2] = sum(mesh.p[2,nds])/4
-        centroids[k,3] = sum(mesh.p[3,nds])/4
-    end
-
-    # Plot result | Uncomment "using GLMakie"
-    plotHField(mesh,centroids,H,true)
 
 end # end of main
 
