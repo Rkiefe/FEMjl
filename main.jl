@@ -45,7 +45,7 @@ function viewMesh(mesh)
     while isopen(screen)
         sleep(0.1)
     end
-    
+
 end # View the mesh using Makie
 
 # Scatter plot of magnetic field
@@ -236,9 +236,53 @@ function main(meshSize=0,localSize=0,showGmsh=true,saveMesh=false)
 
 end # end of main
 
+function geometryFromCAD(meshSize=0,localSize=0,showGmsh=false,saveMesh=false)
+    
+    # Create a geometry
+    gmsh.initialize()
+    
+    # List of cells inside the container
+    cells = []
+
+    # >> Model
+    box = importCAD("STEP_Models/cube.step",cells)
+
+    # Fragment to make a unified geometry
+    _, fragments = gmsh.model.occ.fragment([(3, box)], cells)
+    gmsh.model.occ.synchronize()
+
+    # Update container volume ID
+    box = fragments[1][1][2]
+
+    # Generate Mesh
+    mesh = Mesh(cells,meshSize,localSize,saveMesh)
+    
+    # Get bounding shell surface id
+    shell_id = gmsh.model.getAdjacencies(3, box)[2]
+
+    # Must remove the surface Id of the interior surfaces
+    shell_id = shell_id[1:6] # All other, are interior surfaces
+
+    if showGmsh
+        gmsh.fltk.run()
+    end
+    gmsh.finalize()
+
+    println("Number of elements ",size(mesh.t,2))
+    println("Number of Inside elements ",length(mesh.InsideElements))
+    println("Number of nodes ",size(mesh.p,2))
+    println("Number of Inside nodes ",length(mesh.InsideNodes))
+    println("Number of surface elements ",size(mesh.surfaceT,2))
+
+    # View the mesh using Julia instead of Gmsh
+    viewMesh(mesh)
+
+end
+
 meshSize = 10
 localSize = 0.1
 showGmsh = false
 saveMesh = false
 
 main(meshSize,localSize,showGmsh,saveMesh)
+geometryFromCAD()
