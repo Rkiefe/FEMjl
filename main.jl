@@ -43,6 +43,30 @@ function viewMesh(mesh)
     display(fig)
 end # View the mesh using Makie
 
+# Scatter plot of magnetic field
+function plotHField(mesh,centroids::Matrix{Float64},H::Vector{Float64})
+    fig = Figure()
+    ax = Axis3(fig[1, 1], aspect = :data, title="Magnetic field H")
+
+    # Add |H|
+    scatterPlot = scatter!(ax, 
+        centroids[mesh.InsideElements,1],
+        centroids[mesh.InsideElements,2],
+        centroids[mesh.InsideElements,3], 
+        color = H[mesh.InsideElements], 
+        colormap=:rainbow, 
+        markersize=20 .* mesh.VE[mesh.InsideElements]./maximum(mesh.VE[mesh.InsideElements]))
+
+    # Add colorbar
+    Colorbar(fig[1, 2], scatterPlot, label="H field strength")
+
+    screen = GLMakie.Screen()
+    display(screen,fig)
+    while isopen(screen)
+        sleep(0.1)
+    end
+end # Scatter plot of magnetic field
+
 # FEM linear basis function
 function abcd(p::Matrix{Float64},nodes::Vector{Int32},nd::Int32)
     n1,n2,n3 = nodes[nodes .!= nd]
@@ -148,6 +172,7 @@ function localStiffnessMatrix(mesh,f::Vector{Float64})
 
     return Ak
 end # Local stiffnessmatrix in 100% Julia
+
 
 function main(meshSize=0,localSize=0,showGmsh=true,saveMesh=false)
     #=
@@ -291,38 +316,7 @@ function main(meshSize=0,localSize=0,showGmsh=true,saveMesh=false)
     end
 
     # Plot result | Uncomment "using GLMakie"
-    fig = Figure()
-    ax = Axis3(fig[1, 1], aspect = :data, title="Magnetic field H")
-
-    # Add |H|
-    scatterPlot = scatter!(ax, 
-        centroids[mesh.InsideElements,1],
-        centroids[mesh.InsideElements,2],
-        centroids[mesh.InsideElements,3], 
-        color = H[mesh.InsideElements], 
-        colormap=:rainbow, 
-        markersize=20 .* mesh.VE[mesh.InsideElements]./maximum(mesh.VE[mesh.InsideElements]))
-
-    # Add vector plot
-    # plt = arrows!(ax, 
-    #     centroids[mesh.InsideElements,1],
-    #     centroids[mesh.InsideElements,2],
-    #     centroids[mesh.InsideElements,3], 
-    #     H_vectorField[mesh.InsideElements,1],
-    #     H_vectorField[mesh.InsideElements,2],
-    #     H_vectorField[mesh.InsideElements,3],
-    #     arrowcolor = H[mesh.InsideElements],
-    #     arrowsize = 0.1,
-    #     normalize = false)
-
-    # Add colorbar
-    Colorbar(fig[1, 2], scatterPlot, label="H field strength")
-
-    screen = GLMakie.Screen()
-    display(screen,fig)
-    while isopen(screen)
-        sleep(0.1)
-    end
+    plotHField(mesh,centroids,H)
     
     # Save figure
     # save("H.png",fig)
