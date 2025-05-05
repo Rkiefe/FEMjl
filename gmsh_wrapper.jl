@@ -1,12 +1,12 @@
 #=
-    My wrapper around gmsh functionalities to do only what I need
-    for Finite Element Simulations
-
-    Users can quickly and easily add cuboids and sphere,
-    and import step files.
-
-    It also lets users generate locally refined meshes, with automatic
-    local refinement set for the imported geometry.
+    A wrapper to simplify gmsh interactions. 
+    It helps users with:
+        . Create simple geometries
+        . Combine them into a unified model
+        . Create a local refinement field using a single scalar value (localSize)
+        . Convert the gmsh mesh to a more user friendly MESH() struct
+        . Make a bounding shell for open boundary problems
+        . Manage surface triangles and surface ID's
 =#
 
 function save2file(fileName,input)
