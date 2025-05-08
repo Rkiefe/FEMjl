@@ -14,12 +14,19 @@
         C++ wrapper function
 =#
 
-# For the solver
-using Gmsh, LinearAlgebra, SparseArrays
-include("gmsh_wrapper.jl")
+# Gmsh powers the mesh generation and volume handling
+using Gmsh
+include("../gmsh_wrapper.jl")  # FEMjl functions to operate Gmsh and
+                            # output the mesh in a more familiar format
 
-# For plots | Uncomment the plot section of "main()"
+# Required for solving matrix equations and exploit the sparsity of the matrices
+using LinearAlgebra, SparseArrays
+
+# For plots
 using GLMakie
+
+# Include FEM functions
+include("../FEMjl.jl")
 
 # View the mesh processed by FEMjl, generated with gmsh, using Makie
 function viewMesh(mesh)
@@ -37,7 +44,11 @@ function viewMesh(mesh)
             transparency=true,
             alpha=0.3)
 
-    display(fig)
+    screen = GLMakie.Screen()
+    display(screen,fig)
+    while isopen(screen)
+        sleep(0.1)
+    end
 end # View the mesh using Makie
 
 # Scatter plot of magnetic field
