@@ -28,7 +28,6 @@ using LinearAlgebra, SparseArrays
 # For plots
 using GLMakie
 
-
 # View the mesh processed by FEMjl, generated with gmsh, using Makie
 function viewMesh(mesh)
     fig = Figure()
@@ -51,36 +50,6 @@ function viewMesh(mesh)
         sleep(0.1)
     end
 end # View the mesh using Makie
-
-# Scatter plot of magnetic field
-function plotHField(mesh,centroids::Matrix{Float64},H::Vector{Float64},saveFigure)
-    fig = Figure()
-    ax = Axis3(fig[1, 1], aspect = :data, title="Magnetic field H")
-
-    # Add |H|
-    scatterPlot = scatter!(ax, 
-        centroids[mesh.InsideElements,1],
-        centroids[mesh.InsideElements,2],
-        centroids[mesh.InsideElements,3], 
-        color = H[mesh.InsideElements], 
-        colormap=:rainbow, 
-        markersize=20 .* mesh.VE[mesh.InsideElements]./maximum(mesh.VE[mesh.InsideElements]))
-
-    # Add colorbar
-    Colorbar(fig[1, 2], scatterPlot, label="H field strength")
-
-    screen = GLMakie.Screen()
-    display(screen,fig)
-    while isopen(screen)
-        sleep(0.1)
-    end
-
-    # Save figure
-    if saveFigure
-        save("H.png",fig)
-    end
-end # Scatter plot of magnetic field
-
 
 # Main function | Generates a geometry and mesh
 function main(meshSize=0,localSize=0,showGmsh=false,saveMesh=false)
@@ -139,7 +108,7 @@ function geometryFromCAD(meshSize=0,localSize=0,showGmsh=false,saveMesh=false)
     #=
         Imports a cad file, creates a bounding shell and a 3D mesh
     =#
-    
+
     # Create a geometry
     gmsh.initialize()
     
