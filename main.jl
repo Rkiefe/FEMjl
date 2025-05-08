@@ -31,7 +31,7 @@ using GLMakie
 # View the mesh processed by FEMjl, generated with gmsh, using Makie
 function viewMesh(mesh)
     fig = Figure()
-    ax = Axis3(fig[1, 1], aspect=:equal, title="")
+    ax = Axis3(fig[1, 1], aspect=:data, title="")
     
     # Convert surface triangles to Makie format
     faces = [GLMakie.GLTriangleFace(mesh.surfaceT[1,i], 
@@ -62,28 +62,29 @@ function main(meshSize=0,localSize=0,showGmsh=false,saveMesh=false)
 
     # >> Model
     # Create an empty container
-    box = addCuboid([0,0,0],[4,4,4])
+    # container = addCuboid([0,0,0],[4,4,4])
+    container = addSphere([0,0,0],4)
 
     # List of cells inside the container
     cells = []
 
     # Add another object inside the container
     
-    # addSphere([0,0,0],0.5,cells)
+    # addSphere([0,0,0],0.5,cells,true)
     addCuboid([0,0,0],[1.65,1.65,0.04],cells,true)
 
     # Fragment to make a unified geometry
-    _, fragments = gmsh.model.occ.fragment([(3, box)], cells)
+    _, fragments = gmsh.model.occ.fragment([(3, container)], cells)
     gmsh.model.occ.synchronize()
 
     # Update container volume ID
-    box = fragments[1][1][2]
+    container = fragments[1][1][2]
 
     # Generate Mesh
     mesh = Mesh(cells,meshSize,localSize,saveMesh)
     
     # Get bounding shell surface id
-    shell_id = gmsh.model.getAdjacencies(3, box)[2]
+    shell_id = gmsh.model.getAdjacencies(3, container)[2]
 
     # Must remove the surface Id of the interior surfaces
     shell_id = shell_id[1:6] # All other, are interior surfaces
@@ -150,10 +151,44 @@ function geometryFromCAD(meshSize=0,localSize=0,showGmsh=false,saveMesh=false)
 
 end
 
+function NoBoundingShell(showGmsh)
+    # Create a geometry
+    gmsh.initialize()
+
+    container = addSphere([0,0,0],1)
+    container = addSphere([3,0,0],1)
+
+    # List of cells inside the container
+    cells = []
+    
+    # Fragment to make a unified geometry
+    _, fragments = gmsh.model.occ.fragment([(3, container)], cells)
+    gmsh.model.occ.synchronize()
+
+    # Generate Mesh
+    mesh = Mesh(cells,0,0,false)
+    
+    if showGmsh
+        gmsh.fltk.run()
+    end
+    gmsh.finalize()
+
+    println("Number of elements ",size(mesh.t,2))
+    println("Number of Inside elements ",length(mesh.InsideElements))
+    println("Number of nodes ",size(mesh.p,2))
+    println("Number of Inside nodes ",length(mesh.InsideNodes))
+    println("Number of surface elements ",size(mesh.surfaceT,2))
+
+    # View the mesh using Julia instead of Gmsh
+    viewMesh(mesh)
+end
+
+
 meshSize = 10
 localSize = 0.1
 showGmsh = false
 saveMesh = false
 
-# main(meshSize,localSize,showGmsh,saveMesh)
-geometryFromCAD(0,0,true)
+main(meshSize,localSize,showGmsh,saveMesh)
+geometryFromCAD()
+NoBoundingShell(showGmsh)
