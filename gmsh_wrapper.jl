@@ -70,7 +70,7 @@ function addCuboid(position,dimensions,cells=[],updateCells=false)
 end # Make a cuboid based on its center
 
 # Make a sphere
-function addSphere(position,radius,cells=[],updateCells=true)
+function addSphere(position,radius,cells=[],updateCells=false)
     #=
         Inputs:
             Position vector
@@ -82,7 +82,7 @@ function addSphere(position,radius,cells=[],updateCells=true)
     sphere = gmsh.model.occ.addSphere(position[1],position[2],position[3],radius)
 
     # If sphere is not the container
-    if updateCells # default is true 
+    if updateCells # default is false 
         cells = append!(cells,[(3,sphere)])
     end
 
@@ -123,7 +123,7 @@ function makeContainer(scale=5)
     center = [(x_min + x_max)/2, (y_min + y_max)/2, (z_min + z_max)/2]
     dimensions = scale*L
 
-    box = addSphere(center,dimensions,[],false)
+    box = addSphere(center,dimensions)
     # box = addCuboid(center,dimensions)
 
     # Update model
@@ -172,14 +172,16 @@ function Mesh(cells,meshSize=0,localSize=0,saveMesh=false)
 
     # Get the volume IDs of the cells inside the container
     volumeID = []
-    for i in cells
-        append!(volumeID,i[2])
+    if !isempty(cells)
+        for i in cells
+            append!(volumeID,i[2])
+        end
     end
 
     # >> Mesh settings
     
     # Set local mesh size
-    if localSize>0
+    if localSize>0 && !isempty(cells)
         refineCell(cells,localSize,meshSize) # Set local refinement on the sphere Cell
     end
 
@@ -218,16 +220,21 @@ function Mesh(cells,meshSize=0,localSize=0,saveMesh=false)
     mesh.ne = size(mesh.surfaceT,2)
 
     # Mesh elements inside the container
-    InsideElements = zeros(mesh.nt,1)
-    for k in 1:mesh.nt
-        etype,nodeTags,dim, id = gmsh.model.mesh.getElement(t_tags[k])
-        # element type , nodes of the element , dimension , id
-        if id in volumeID
-            InsideElements[k] = k
+    if !isempty(cells)
+        InsideElements = zeros(mesh.nt,1)
+        for k in 1:mesh.nt
+            etype,nodeTags,dim, id = gmsh.model.mesh.getElement(t_tags[k])
+            # element type , nodes of the element , dimension , id
+            if id in volumeID
+                InsideElements[k] = k
+            end
         end
+        mesh.InsideElements = Int.(InsideElements[InsideElements.!=0])
+        mesh.nInside = length(mesh.InsideElements)
+    else
+        mesh.InsideElements = []
+        mesh.nInside = 0
     end
-    mesh.InsideElements = Int.(InsideElements[InsideElements.!=0])
-    mesh.nInside = length(mesh.InsideElements)
 
     # Inside nodes
     aux::Matrix{Int32} = mesh.t[:,mesh.InsideElements]
