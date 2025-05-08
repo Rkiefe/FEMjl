@@ -66,6 +66,8 @@ function addCuboid(position,dimensions,cells=[],updateCells=false)
         cells = append!(cells,[(3,box)])
     end
 
+    # Sync kernel before exiting
+    gmsh.model.occ.synchronize()
     return box
 end # Make a cuboid based on its center
 
@@ -86,6 +88,8 @@ function addSphere(position,radius,cells=[],updateCells=false)
         cells = append!(cells,[(3,sphere)])
     end
 
+    # Sync kernel before exiting
+    gmsh.model.occ.synchronize()
     return sphere
 end # Make a sphere
 
