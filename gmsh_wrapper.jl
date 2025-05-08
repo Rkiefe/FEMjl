@@ -24,6 +24,11 @@ function refineCell(cell,localSize,meshSize)
         Sets every volume in 'cell' to be locally refined with target 'localSize' 
     =#
 
+    if isempty(cell)
+        println("No cell to refine, function returned")
+        return
+    end
+
     # Get the boundary of the cell 
     cell_boundary = gmsh.model.getBoundary(cell, false, false, false)
 
@@ -50,14 +55,14 @@ end # Local mesh refinement on target cell
 function addCuboid(position,dimensions,cells=[],updateCells=false)
     #=
         Makes a cuboid based on its centroid position
-        Updates the cells list in case this cuboid is not meant to be
+        Updates the cells list if this cuboid is not meant to be
         the container of the simulation
     =#
 
     r = position - dimensions/2
     box = gmsh.model.occ.addBox(r[1], r[2], r[3], dimensions[1], dimensions[2], dimensions[3])
     
-    if updateCells
+    if updateCells # default is false
         cells = append!(cells,[(3,box)])
     end
 
@@ -77,7 +82,7 @@ function addSphere(position,radius,cells=[],updateCells=true)
     sphere = gmsh.model.occ.addSphere(position[1],position[2],position[3],radius)
 
     # If sphere is not the container
-    if updateCells    
+    if updateCells # default is true 
         cells = append!(cells,[(3,sphere)])
     end
 
@@ -116,9 +121,10 @@ function makeContainer(scale=5)
 
     # Container position and dimensions
     center = [(x_min + x_max)/2, (y_min + y_max)/2, (z_min + z_max)/2]
-    dimensions = scale*[L,L,L]
+    dimensions = scale*L
 
-    box = addCuboid(center,dimensions)
+    box = addSphere(center,dimensions,[],false)
+    # box = addCuboid(center,dimensions)
 
     # Update model
     gmsh.model.occ.synchronize()
