@@ -31,7 +31,7 @@ include("../FEMjl.jl")
 # View the mesh processed by FEMjl, generated with gmsh, using Makie
 function viewMesh(mesh)
     fig = Figure()
-    ax = Axis3(fig[1, 1], aspect=:equal, title="")
+    ax = Axis3(fig[1, 1], aspect=:data, title="")
     
     # Convert surface triangles to Makie format
     faces = [GLMakie.GLTriangleFace(mesh.surfaceT[1,i], 
@@ -105,7 +105,13 @@ function main(meshSize=0,localSize=0,showGmsh=true,saveMesh=false)
 
     # >> Model
     # Create an empty container
-    box = addCuboid([0,0,0],[4,4,4])
+    # container = addCuboid([0,0,0],[4,4,4])
+    container = addSphere([0,0,0],4)
+
+    # Get how many surfaces compose the bounding shell
+    temp = gmsh.model.getEntities(2)            # Get all surfaces of current model
+    bounding_shell_n_surfaces = 1:length(temp)    # Get the number of surfaces in the bounding shell
+
 
     # List of cells inside the container
     cells = []
@@ -116,20 +122,20 @@ function main(meshSize=0,localSize=0,showGmsh=true,saveMesh=false)
 
 
     # Fragment to make a unified geometry
-    _, fragments = gmsh.model.occ.fragment([(3, box)], cells)
+    _, fragments = gmsh.model.occ.fragment([(3, container)], cells)
     gmsh.model.occ.synchronize()
 
     # Update container volume ID
-    box = fragments[1][1][2]
+    container = fragments[1][1][2]
 
     # Generate Mesh
     mesh = Mesh(cells,meshSize,localSize,saveMesh)
     
     # Get bounding shell surface id
-    shell_id = gmsh.model.getAdjacencies(3, box)[2]
+    shell_id = gmsh.model.getAdjacencies(3, container)[2]
 
     # Must remove the surface Id of the interior surfaces
-    shell_id = shell_id[1:6] # All other, are interior surfaces
+    shell_id = shell_id[bounding_shell_n_surfaces] # All other, are interior surfaces
 
     if showGmsh
         gmsh.fltk.run()
