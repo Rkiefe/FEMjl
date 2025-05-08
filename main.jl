@@ -62,8 +62,12 @@ function main(meshSize=0,localSize=0,showGmsh=false,saveMesh=false)
 
     # >> Model
     # Create an empty container
-    # container = addCuboid([0,0,0],[4,4,4])
-    container = addSphere([0,0,0],4)
+    container = addCuboid([0,0,0],[4,4,4])
+    # container = addSphere([0,0,0],4)
+
+    # Get how many surfaces compose the bounding shell
+    temp = gmsh.model.getEntities(2)            # Get all surfaces of current model
+    bounding_shell_n_surfaces = 1:length(temp)    # Get the number of surfaces in the bounding shell
 
     # List of cells inside the container
     cells = []
@@ -87,7 +91,7 @@ function main(meshSize=0,localSize=0,showGmsh=false,saveMesh=false)
     shell_id = gmsh.model.getAdjacencies(3, container)[2]
 
     # Must remove the surface Id of the interior surfaces
-    shell_id = shell_id[1:6] # All other, are interior surfaces
+    shell_id = shell_id[bounding_shell_n_surfaces] # All other, are interior surfaces
 
     if showGmsh
         gmsh.fltk.run()
@@ -133,7 +137,7 @@ function geometryFromCAD(meshSize=0,localSize=0,showGmsh=false,saveMesh=false)
     shell_id = gmsh.model.getAdjacencies(3, container)[2]
 
     # Must remove the surface Id of the interior surfaces
-    shell_id = shell_id[1] # All other, are interior surfaces
+    shell_id = shell_id[1] # Using importCAD, the bounding shell is always a sphere
 
     if showGmsh
         gmsh.fltk.run()
@@ -148,7 +152,6 @@ function geometryFromCAD(meshSize=0,localSize=0,showGmsh=false,saveMesh=false)
 
     # View the mesh using Julia instead of Gmsh
     viewMesh(mesh)
-
 end
 
 function NoBoundingShell(showGmsh)
@@ -190,5 +193,5 @@ showGmsh = false
 saveMesh = false
 
 main(meshSize,localSize,showGmsh,saveMesh)
-geometryFromCAD()
-NoBoundingShell(showGmsh)
+# geometryFromCAD()
+# NoBoundingShell(showGmsh)
