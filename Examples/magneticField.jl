@@ -44,7 +44,6 @@ function viewMesh(mesh)
             transparency=true,
             alpha=0.3)
 
-    display(fig)
     wait(display(fig))
 end # View the mesh using Makie
 
