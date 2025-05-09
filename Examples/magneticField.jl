@@ -44,11 +44,8 @@ function viewMesh(mesh)
             transparency=true,
             alpha=0.3)
 
-    screen = GLMakie.Screen()
-    display(screen,fig)
-    while isopen(screen)
-        sleep(0.1)
-    end
+    display(fig)
+    wait(display(fig))
 end # View the mesh using Makie
 
 # Scatter plot of magnetic field
