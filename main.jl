@@ -22,6 +22,10 @@ using Gmsh
 include("gmsh_wrapper.jl")  # FEMjl functions to operate Gmsh and
                             # output the mesh in a more familiar format
 
+# Import FEMjl interpolation methods
+include("Interpolation.jl")
+import .interp as InP
+
 # Required for solving matrix equations and exploit the sparsity of the matrices
 using LinearAlgebra, SparseArrays
 
