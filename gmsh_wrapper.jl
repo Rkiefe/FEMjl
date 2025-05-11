@@ -243,6 +243,7 @@ function Mesh(cells,meshSize=0,localSize=0,saveMesh=false)
     # Inside nodes
     aux::Matrix{Int32} = mesh.t[:,mesh.InsideElements]
     mesh.InsideNodes = unique(vec(aux))
+    mesh.nInsideNodes = length(mesh.InsideNodes)
 
     # Element volumes
     mesh.VE = zeros(mesh.nt)
@@ -346,11 +347,11 @@ mutable struct MESH
     # Normal of each surface triangle
     normal::Matrix{Float64}
     
-    nv::Int32       # Number of nodes
-    nt::Int32       # Number of elements
-    ne::Int32       # Number of surface elements
-    nInside::Int32  # Number of elements for the inside cells
-
+    nv::Int32           # Number of nodes
+    nt::Int32           # Number of elements
+    ne::Int32           # Number of surface elements
+    nInside::Int32      # Number of elements for the inside cells
+    nInsideNodes::Int32 # Numberf of nodes for the inside cells
     # Constructor
     MESH() = new()
 end
