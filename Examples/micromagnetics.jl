@@ -357,16 +357,16 @@ function main(meshSize=0,localSize=0,showGmsh=true,saveMesh=false)
 
     # ---- Initial magnetic field ----
     
-    # Applied field
+    # Applied field (T)
     Hext::Matrix{Float64} = zeros(3,mesh.nInsideNodes) .+ mu0.*Hap
 
-    # Demagnetizing field
+    # Demagnetizing field (T)
     Hd::Matrix{Float64} = demagField(mesh,fixed,free,AD,m)
     
-    # Exchange field
+    # Exchange field (T)
     Hexc::Matrix{Float64} = -2*Aexc.* (A*m[:,mesh.InsideNodes]')'
 
-    # Anisotropy field
+    # Anisotropy field (T)
     Han::Matrix{Float64} = zeros(3,mesh.nInsideNodes)
     for i in 1:mesh.nInsideNodes
         nd = mesh.InsideNodes[i]
@@ -383,7 +383,30 @@ function main(meshSize=0,localSize=0,showGmsh=true,saveMesh=false)
     # plotHField(mesh,Hexc)
     # plotHField(mesh,Han)
 
+    # Effective field
+    Heff::Matrix{Float64} = Hext + Hd + Hexc + Han;
+    
+    # Torque term
+    H::Matrix{Float64} = zeros(3,mesh.nInsideNodes) 
+    for i in 1:mesh.nInsideNodes
+        H[:,i] = Heff[:,i] + damp.*cross(m[:,i],Heff[:,i])
+    end
 
+    # Energy density
+    Eext::Float64   = 0
+    Ed::Float64     = 0
+    Eexc::Float64   = 0
+    Ean::Float64    = 0
+
+    @inbounds for i in 1:mesh.nInsideNodes
+        Eext    -= dot(m[:,i],Hext[:,i])
+        Ed      -= 0.5*dot(m[:,i],Hd[:,i])
+        Eexc    -= 0.5*dot(m[:,i],Hexc[:,i])
+        Ean     -= 0.5*dot(m[:,i],Han[:,i])
+    end
+    E::Float64 = mu0*Ms*(Eext + Ed + Eexc + Ean)
+
+    
 end # end of main
 
 
