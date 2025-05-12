@@ -101,51 +101,6 @@ function initialMagnetization(mesh,random=true,direction=[1,0,0])
     return m
 end # Initialize magnetization field
 
-function findNodes(mesh,region::String,id)
-    # region    - face | volume
-    # id        - Int or vector of Int 
-
-    nodesFound::Vector{Int32} = zeros(mesh.nv)
-    n::Int32 = 0 # Number of nodes found
-    
-    if region == "face" || region == "Face" # added "Face" to handle variations
-
-        # Go to each surface triangle
-        for s in 1:mesh.ne
-            # Get the surface id of current triangle
-            current_Id::Int32 = mesh.surfaceT[end,s]
-            if current_Id in id
-                # Nodes of current triangle
-                nds = @view mesh.surfaceT[1:3,s]
-
-                # Update number of nodes found
-                for nd in nds
-                    if nodesFound[nd] < 1   # Only count those who were not found yet
-                        n += 1                  # count it
-                    end
-                end
-
-                # Update the nodes found with desired face ID
-                nodesFound[nds] .= 1
-            end
-        end
-
-        # Prepare the output
-        nodes::Vector{Int32} = zeros(n)
-        j::Int32 = 0
-        for nd in 1:mesh.nv
-            if nodesFound[nd] > 0
-                j += 1
-                nodes[j] = nd
-            end
-        end
-
-    else # volume
-        # not implemented yet
-    end
-
-    return nodes
-end
 
 # Mean function
 function mean(arr::Vector,dimension=1)
@@ -554,16 +509,6 @@ function main(meshSize=0,localSize=0,showGmsh=true,saveMesh=false)
         if 1e9 * t > 0.4
             break
         end
-
-        # Check if average magnetization is stable
-        # if it > 20
-        #     div = norm(M_avg[:,it]-M_avg(:,it-1))
-        #     println("t (ns): ",t*1e9," div(x100): ",100*div)
-        #     if div < maxTau
-        #         println("Average magnetization is stable")
-        #         break
-        #     end
-        # end
 
     end # End of time iteration
 
