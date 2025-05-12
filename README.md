@@ -2,13 +2,16 @@
 The philosophy of this repository is to serve as a kickstart to anyone who wants to make their own Finite-Element implementation, without worrying about mesh generation or 3D modeling. Julia with some C++ interop shows high performance capabilities, with simple syntax and flexibility.
 
 ## Examples
+
+This framework already has a few implementations in the Examples folder. One of which is a fully realized micromagnetic solver, capable of simulating the time dependent magnetization, considering an external magnetic field, the demagnetizing field, the exchange field and the anisotropy field. This solver was validated against OOMMF, replicating Fig 2. of this article https://doi.org/10.1109/TMAG.2008.2001666 .
+
+![M_time](https://github.com/user-attachments/assets/1a3e17aa-ccd1-4257-994f-d04ddcff154b)
+
 Here is a direct output of magneticField.jl example `main()`, the internal magnetic field of a plate aligned with the aplied field.
 ![H_plate](https://github.com/user-attachments/assets/0b03a7a4-1872-4402-a10f-1654ce149a1f)
 
 And now for a sphere. Both of these geometries were created with simple commands.
 ![magneticfield_example](https://github.com/user-attachments/assets/86fc8c7c-7e8a-4f6b-a807-0df6720f1a1b)
-
-I'm currently adding micromagnetic simulations to the Examples folder. I plan to use Julia GPU parallelization to then boost the simulation performance.
 
 ## Functionality
 Make a high quality 3D mesh of your 3D model and get all the properties you need, easily accessible in a simple MESH() object, powered by Gmsh. Make a local refinement of your model, based on the volume ID, or just set a target mesh size.
