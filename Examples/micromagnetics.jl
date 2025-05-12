@@ -365,6 +365,13 @@ function main(meshSize=0,localSize=0,showGmsh=true,saveMesh=false)
     
     # Exchange field
     Hexc::Matrix{Float64} = -2*Aexc.* (A*m[:,mesh.InsideNodes]')'
+
+    # Anisotropy field
+    Han::Matrix{Float64} = zeros(3,mesh.nInsideNodes)
+    for i in 1:mesh.nInsideNodes
+        nd = mesh.InsideNodes[i]
+        Han[:,i] = 2*Aan/Ms*dot(m[:,nd],uan).*uan;
+    end
     
     # Convert to proper unis
     @simd for i in 1:3
@@ -374,6 +381,7 @@ function main(meshSize=0,localSize=0,showGmsh=true,saveMesh=false)
     
     # plotHField(mesh,Hd)
     # plotHField(mesh,Hexc)
+    # plotHField(mesh,Han)
 
 
 end # end of main
