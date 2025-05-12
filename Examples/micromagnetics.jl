@@ -320,7 +320,6 @@ function main(meshSize=0,localSize=0,showGmsh=true,saveMesh=false)
 
     # Stiffness matrix, with only the internal mesh elements | for the exchange field
     Ak::Matrix{Float64} = zeros(4*4,mesh.nt)
-    
     A = spzeros(mesh.nv,mesh.nv)
     begin # Make a local scope to keep the workspace clean
         
@@ -364,12 +363,18 @@ function main(meshSize=0,localSize=0,showGmsh=true,saveMesh=false)
     # Demagnetizing field
     Hd::Matrix{Float64} = demagField(mesh,fixed,free,AD,m)
     
-    # Convert to proper units
+    # Exchange field
+    Hexc::Matrix{Float64} = -2*Aexc.* (A*m[:,mesh.InsideNodes]')'
+    
+    # Convert to proper unis
     @simd for i in 1:3
-        Hd[i,:] .= mu0*Ms .*Hd[i,:]./Vn
+        Hd[i,:]     .*= mu0*Ms./Vn
+        Hexc[i,:]   ./= Ms*scl^2 .*nodeVolume
     end
+    
+    # plotHField(mesh,Hd)
+    # plotHField(mesh,Hexc)
 
-    plotHField(mesh,Hd)
 
 end # end of main
 
