@@ -64,11 +64,7 @@ function plotHField(mesh,centroids::Matrix{Float64},H::Vector{Float64},saveFigur
     # Add colorbar
     Colorbar(fig[1, 2], scatterPlot, label="H field strength")
 
-    screen = GLMakie.Screen()
-    display(screen,fig)
-    while isopen(screen)
-        sleep(0.1)
-    end
+    wait(display(fig))
 
     # Save figure
     if saveFigure
