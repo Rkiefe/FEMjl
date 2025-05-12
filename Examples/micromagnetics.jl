@@ -287,12 +287,12 @@ function main(meshSize=0,localSize=0,showGmsh=true,saveMesh=false)
     # Constants
     mu0 = pi*4e-7                   # vacuum magnetic permeability
     giro = 2.210173e5 /mu0          # Gyromagnetic ratio (rad T-1 s-1)
-    dt::Float64 = 0.03/giro         # Time step in reduced units (seconds per gyro)
+    dt::Float64 = 0.028/giro        # Time step in reduced units (seconds per gyro)
     damp::Float64 = 0.1             # Damping parameter (dimensionless [0,1])
     precession::Bool = true         # Include precession or not
 
     # Dimension of the magnetic material (rectangle)
-    L::Vector{Float64} = [512,128,30]
+    L::Vector{Float64} = [100,100,5]
     scl::Float64 = 1e-9                 # scale of the geometry | (m -> nm)
     
     # Conditions
@@ -300,11 +300,11 @@ function main(meshSize=0,localSize=0,showGmsh=true,saveMesh=false)
     Aexc = 13e-12                      # Exchange   (J/m)
     Aan  = 0                           # Anisotropy (J/m3)
     uan::Vector{Float64}  = [1,0,0]    # easy axis direction
-    Hap::Vector{Float64}  = [0,0,0]    # A/m
+    Hap::Vector{Float64}  = [0,50e3,0] # A/m
 
     # Convergence criteria
     maxDeviation::Float64 = 1e-5     # Maximum difference between current and previous <M>
-    maxAtt::Int32 = Int(1e3)         # max number of iterations for the LL solver
+    maxAtt::Int32 = Int(1e4)         # max number of iterations for the LL solver
 
     # Create a geometry
     gmsh.initialize()
@@ -348,13 +348,16 @@ function main(meshSize=0,localSize=0,showGmsh=true,saveMesh=false)
     println("Number of Inside nodes ",length(mesh.InsideNodes))
     println("Number of surface elements ",size(mesh.surfaceT,2))
 
+    # Comment this if you want to check the mesh size before running
+    # return 
+
     # View the mesh using Julia instead of Gmsh
     # viewMesh(mesh)
 
     # ------------- Micromagnetic simulation --------------
     
     # Initial magnetization value | true -> random field
-    m::Matrix{Float64} = initialMagnetization(mesh,true)
+    m::Matrix{Float64} = initialMagnetization(mesh,false,[1,0,0])
 
     # Volume of elements of each mesh node | Needed for the demagnetizing field
     Vn::Vector{Float64} = zeros(mesh.nv)
@@ -473,10 +476,13 @@ function main(meshSize=0,localSize=0,showGmsh=true,saveMesh=false)
     E_time::Vector{Float64} = zeros(maxAtt)
     torque_time::Vector{Float64} = zeros(maxAtt)
 
-    it::Int32 = 1
-    for it in 1:3#maxAtt
-        t += dt
-        # println("t (ns): ",t*1e9)
+
+    it::Int32 = 0
+    for att in 1:maxAtt
+        it = att # Store the number of time iterations 
+        t += dt  # Update the time
+
+        println(1e9*t," ns")
 
         # Rotate magnetization
         for i in 1:mesh.nInsideNodes
@@ -544,15 +550,20 @@ function main(meshSize=0,localSize=0,showGmsh=true,saveMesh=false)
         # Average magnetization
         M_avg[:,it] = mean(m[:,mesh.InsideNodes],2)
 
-        # Check if average magnetization is stable
-        if it > 20
-            div = norm(M_avg[:,it]-M_avg(:,it-1))
-            println("t (ns): ",t*1e9," div(x100): ",100*div)
-            # if div < maxTau
-            #     println("Average magnetization is stable")
-            #     break
-            # end
+        # Stop at 0.4 ns
+        if 1e9 * t > 0.4
+            break
         end
+
+        # Check if average magnetization is stable
+        # if it > 20
+        #     div = norm(M_avg[:,it]-M_avg(:,it-1))
+        #     println("t (ns): ",t*1e9," div(x100): ",100*div)
+        #     if div < maxTau
+        #         println("Average magnetization is stable")
+        #         break
+        #     end
+        # end
 
     end # End of time iteration
 
@@ -561,19 +572,25 @@ function main(meshSize=0,localSize=0,showGmsh=true,saveMesh=false)
     E_time      = E_time[1:it]
     torque_time = torque_time[1:it]
 
+    time::Vector{Float64} = 1e9*dt .* (1:it)
+
     fig = Figure()
     ax = Axis(  fig[1,1], 
-                xlabel = "x label", 
-                ylabel = "y label",
-                title = "Title")
-    plot!(ax,1:it,E_time)
+                xlabel = "Time (ns)", 
+                ylabel = "<M> (kA/m)",
+                title = "Micromagnetic simulation")
+
+    scatter!(ax,time,Ms/1000 .*M_avg[1,:], label = "M_x")
+    scatter!(ax,time,Ms/1000 .*M_avg[2,:], label = "M_y")
+    scatter!(ax,time,Ms/1000 .*M_avg[3,:], label = "M_z")
+    axislegend() # position = :rt
+
     wait(display(fig))
-
-
+    save("M_time.png",fig)
 end # end of main
 
-meshSize = 10
-localSize = 0.1
+meshSize = 200
+localSize = 5
 showGmsh = false
 saveMesh = false
 
