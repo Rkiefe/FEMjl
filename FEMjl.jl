@@ -16,7 +16,7 @@ function abcd(p::Matrix{Float64},nodes::Vector{Int32},nd::Int32)
 end # Basis function coef.
 
 # Sparse, global stiffness matrix
-function stiffnessMatrix(mesh,f::Vector{Float64})
+function stiffnessMatrix(mesh,f::Vector{Float64}=ones(mesh.nt))
     A = spzeros(mesh.nv,mesh.nv)
 
     # Local stiffness matrix
