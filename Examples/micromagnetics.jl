@@ -227,17 +227,72 @@ function demagField(mesh,fixed::Vector{Int32},free::Vector{Int32},A,m::Matrix{Fl
     return Hd
 end
 
+# Find new magnetization direction iteratively
+function iterate(M::Vector{Float64},H::Vector{Float64},Hold::Vector{Float64},Heff::Vector{Float64},damp::Float64,giro::Float64,dt::Float64,precession::Bool)
+    #=
+        Finds the new magnetization direction given:
+         .the current magnetization direction (M)
+         .the magnetic field H tilde (H) for current and previous iteration
+         .the effective field (Heff) for the current iteration
+
+        H tilde = Heff + damp*cross(m,Heff)
+    =#
+    Mnew::Vector{Float64} = zeros(length(M))
+
+    d = giro*dt/2
+    
+    # 1. Calculate H n + 1/2 from the previous two magnetic fields (H n and H n-1)
+    h12 = 3/2 .*H - 0.5 .*Hold
+
+    aux = M
+    err::Float64 = 1.0
+    att::Int32 = 0
+    while err > 1e-6
+        att += 1
+
+        # 2. M (n+1) from M and H(n+1/2)
+        mat::Matrix{Float64} = [1 d*h12[3] -d*h12[2];
+                                -d*h12[3] 1 d*h12[1];
+                                d*h12[2] -d*h12[1] 1];
+
+        Mnew = mat\(M-d.*cross(M,h12))
+
+        # 3. M (n + 1/2)
+        m12 = 0.5*(M+Mnew)
+
+        # 4. Calculate H (n + 1/2) from the M (n + 1/2)
+        h12 = precession*Heff + damp.*cross(m12,Heff)
+
+        # Difference between the new guess and the previous guess
+        # err = norm(Mnew-aux)
+        err = maximum(abs.(Mnew-aux))
+        
+        # println(err)
+
+        # Store new value of M (n+1)
+        aux = Mnew
+
+        if att > 50
+            println("Magnetization iteration stuck")
+            break
+        end
+
+    end # End of loop to find new magnetization direction
+    
+    return Mnew
+end # Iteration function to find new magnetization direction
+
 function main(meshSize=0,localSize=0,showGmsh=true,saveMesh=false)
     
     # Constants
-    mu0 = pi*4e-7                # vacuum magnetic permeability
-    giro = 2.210173e5 /mu0       # Gyromagnetic ratio (rad T-1 s-1)
-    dt::Float64 = 0.03/giro      # Time step in reduced units (seconds per gyro)
-    damp::Float64 = 1            # Damping parameter (dimensionless [0,1])
-    precession::Bool = false     # Include precession or not
+    mu0 = pi*4e-7                   # vacuum magnetic permeability
+    giro = 2.210173e5 /mu0          # Gyromagnetic ratio (rad T-1 s-1)
+    dt::Float64 = 0.03/giro         # Time step in reduced units (seconds per gyro)
+    damp::Float64 = 0.1             # Damping parameter (dimensionless [0,1])
+    precession::Bool = true         # Include precession or not
 
     # Dimension of the magnetic material (rectangle)
-    L::Vector{Float64} = [1.65,1.65,0.04]
+    L::Vector{Float64} = [512,128,30]
     scl::Float64 = 1e-9                 # scale of the geometry | (m -> nm)
     
     # Conditions
@@ -299,7 +354,7 @@ function main(meshSize=0,localSize=0,showGmsh=true,saveMesh=false)
     # ------------- Micromagnetic simulation --------------
     
     # Initial magnetization value | true -> random field
-    m::Matrix{Float64} = initialMagnetization(mesh,false)
+    m::Matrix{Float64} = initialMagnetization(mesh,true)
 
     # Volume of elements of each mesh node | Needed for the demagnetizing field
     Vn::Vector{Float64} = zeros(mesh.nv)
@@ -370,7 +425,7 @@ function main(meshSize=0,localSize=0,showGmsh=true,saveMesh=false)
     Han::Matrix{Float64} = zeros(3,mesh.nInsideNodes)
     for i in 1:mesh.nInsideNodes
         nd = mesh.InsideNodes[i]
-        Han[:,i] = 2*Aan/Ms*dot(m[:,nd],uan).*uan;
+        Han[:,i] = 2*Aan/Ms*dot(m[:,nd],uan).*uan
     end
     
     # Convert to proper unis
@@ -384,7 +439,7 @@ function main(meshSize=0,localSize=0,showGmsh=true,saveMesh=false)
     # plotHField(mesh,Han)
 
     # Effective field
-    Heff::Matrix{Float64} = Hext + Hd + Hexc + Han;
+    Heff::Matrix{Float64} = Hext + Hd + Hexc + Han
     
     # Torque term
     H::Matrix{Float64} = zeros(3,mesh.nInsideNodes) 
@@ -393,23 +448,129 @@ function main(meshSize=0,localSize=0,showGmsh=true,saveMesh=false)
     end
 
     # Energy density
-    Eext::Float64   = 0
-    Ed::Float64     = 0
-    Eexc::Float64   = 0
-    Ean::Float64    = 0
+    Eext::Float64  = 0
+    Ed::Float64    = 0
+    Eexc::Float64  = 0
+    Ean::Float64   = 0
 
-    @inbounds for i in 1:mesh.nInsideNodes
-        Eext    -= dot(m[:,i],Hext[:,i])
-        Ed      -= 0.5*dot(m[:,i],Hd[:,i])
-        Eexc    -= 0.5*dot(m[:,i],Hexc[:,i])
-        Ean     -= 0.5*dot(m[:,i],Han[:,i])
+    for i in 1:mesh.nInsideNodes
+        Eext -= dot(m[:,i],Hext[:,i])
+        Ed   -= 0.5*dot(m[:,i],Hd[:,i])
+        Eexc -= 0.5*dot(m[:,i],Hexc[:,i])
+        Ean  -= 0.5*dot(m[:,i],Han[:,i])
     end
     E::Float64 = mu0*Ms*(Eext + Ed + Eexc + Ean)
 
+    # -------- time iteration ---------
+
+    # Store initial conditions
+    Hold::Matrix{Float64} = H
+    Eold::Float64 = E
+
+    t::Float64 = 0 # Initial time
+
+    M_avg::Matrix{Float64} = zeros(3,maxAtt)   
+    E_time::Vector{Float64} = zeros(maxAtt)
+    torque_time::Vector{Float64} = zeros(maxAtt)
+
+    it::Int32 = 1
+    for it in 1:3#maxAtt
+        t += dt
+        # println("t (ns): ",t*1e9)
+
+        # Rotate magnetization
+        for i in 1:mesh.nInsideNodes
+            nd = mesh.InsideNodes[i]
+            m[:,nd] = iterate(m[:,nd],H[:,i],Hold[:,i],Heff[:,i],damp,giro,dt,precession)
+        end
+
+        # New magnetic field
+        Hold = H
+        Eold = E
+
+        # Applied field (T)
+        # Hext::Matrix{Float64} = zeros(3,mesh.nInsideNodes) .+ mu0.*Hap
+
+        # Demagnetizing field (T)
+        Hd = demagField(mesh,fixed,free,AD,m)
+        
+        # Exchange field (T)
+        Hexc = -2*Aexc.* (A*m[:,mesh.InsideNodes]')'
+
+        # Anisotropy field (T)
+        Han = zeros(3,mesh.nInsideNodes)
+        for i in 1:mesh.nInsideNodes
+            nd = mesh.InsideNodes[i]
+            Han[:,i] = 2*Aan/Ms*dot(m[:,nd],uan).*uan
+        end
+        
+        # Convert to proper unis
+        @simd for i in 1:3
+            Hd[i,:]     .*= mu0*Ms./Vn
+            Hexc[i,:]   ./= Ms*scl^2 .*nodeVolume
+        end
+
+        # Effective field
+        Heff = Hext + Hd + Hexc + Han
+        
+        # Torque term
+        H = zeros(3,mesh.nInsideNodes) 
+        for i in 1:mesh.nInsideNodes
+            H[:,i] = Heff[:,i] + damp.*cross(m[:,i],Heff[:,i])
+        end
+
+        # Energy density
+        Eext = 0
+        Ed   = 0
+        Eexc = 0
+        Ean  = 0
+
+        for i in 1:mesh.nInsideNodes
+            Eext -= dot(m[:,i],Hext[:,i])
+            Ed   -= 0.5*dot(m[:,i],Hd[:,i])
+            Eexc -= 0.5*dot(m[:,i],Hexc[:,i])
+            Ean  -= 0.5*dot(m[:,i],Han[:,i])
+        end
+        E = mu0*Ms*(Eext + Ed + Eexc + Ean)
+        E_time[it] = E # Store the energy for each time step
+
+        # Average torque
+        dtau::Float64 = 0
+        for i = 1:mesh.nInsideNodes
+            dtau += norm(cross(m[:,mesh.InsideNodes[i]],Heff[:,i]))
+        end
+        torque_time[it] = dtau/mesh.nInsideNodes
     
+        # Average magnetization
+        M_avg[:,it] = mean(m[:,mesh.InsideNodes],2)
+
+        # Check if average magnetization is stable
+        if it > 20
+            div = norm(M_avg[:,it]-M_avg(:,it-1))
+            println("t (ns): ",t*1e9," div(x100): ",100*div)
+            # if div < maxTau
+            #     println("Average magnetization is stable")
+            #     break
+            # end
+        end
+
+    end # End of time iteration
+
+    # Remove excess zeros
+    M_avg       = M_avg[:,1:it]
+    E_time      = E_time[1:it]
+    torque_time = torque_time[1:it]
+
+    fig = Figure()
+    ax = Axis(  fig[1,1], 
+                xlabel = "x label", 
+                ylabel = "y label",
+                title = "Title")
+    plot!(ax,1:it,E_time)
+    wait(display(fig))
+
+
 end # end of main
-
-
 
 meshSize = 10
 localSize = 0.1
