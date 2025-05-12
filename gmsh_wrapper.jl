@@ -160,6 +160,52 @@ function importCAD(file,cells=[],box=[],scale=5)
     return box
 end # Import cad geometry file
 
+function findNodes(mesh,region::String,id)
+    # region    - face | volume
+    # id        - Int or vector of Int 
+
+    nodesFound::Vector{Int32} = zeros(mesh.nv)
+    n::Int32 = 0 # Number of nodes found
+    
+    if region == "face" || region == "Face" # added "Face" to handle variations
+
+        # Go to each surface triangle
+        for s in 1:mesh.ne
+            # Get the surface id of current triangle
+            current_Id::Int32 = mesh.surfaceT[end,s]
+            if current_Id in id
+                # Nodes of current triangle
+                nds = @view mesh.surfaceT[1:3,s]
+
+                # Update number of nodes found
+                for nd in nds
+                    if nodesFound[nd] < 1   # Only count those who were not found yet
+                        n += 1                  # count it
+                    end
+                end
+
+                # Update the nodes found with desired face ID
+                nodesFound[nds] .= 1
+            end
+        end
+
+        # Prepare the output
+        nodes::Vector{Int32} = zeros(n)
+        j::Int32 = 0
+        for nd in 1:mesh.nv
+            if nodesFound[nd] > 0
+                j += 1
+                nodes[j] = nd
+            end
+        end
+
+    else # volume
+        # not implemented yet
+    end
+
+    return nodes
+end
+
 function Mesh(cells,meshSize=0,localSize=0,saveMesh=false)
     #=
         Generates a 3d tetrahedral mesh considering that the model is made of 
