@@ -1,6 +1,12 @@
 # FEMjl
 The philosophy of this repository is to serve as a kickstart to anyone who wants to make their own Finite-Element implementation, without worrying about mesh generation or 3D modeling. Julia with some C++ interop shows high performance capabilities, with simple syntax and flexibility.
 
+## Table of Contents
+- [Installation](#examples)
+- [Usage](#functionality)
+- [Features](#installation)
+<!-- - [License](#license) -->
+
 ## Examples
 
 This framework already has a few implementations in the Examples folder. One of which is a fully realized micromagnetic solver, capable of simulating the time dependent magnetization, considering an external magnetic field, the demagnetizing field, the exchange field and the anisotropy field. This solver was validated against OOMMF, replicating Fig 2. of this article https://doi.org/10.1109/TMAG.2008.2001666 .
@@ -48,7 +54,7 @@ The output mesh object is optimized for Finite-Element simulations. The main.jl 
 To install, go to your Julia repl and add Gmsh, LinearAlgebra and SparseArrays. That's it.
 ![twoBalls](https://github.com/user-attachments/assets/3b9549ba-3968-40f1-94a4-5c21ce37ca9e)
 
-If you wish to make plots directly from this repository, run "add GLMakie" to install this plots package, and the run the plotting functions presented, such as `viewMesh()` 
+If you wish to make plots directly from this repository, run "add GLMakie" to install this plots package, and to run the plotting functions presented, such as `viewMesh()` 
 
 ### Running C++ variants within the Julia environment
 Recently, this repository was updated to include an example of how you can add C++ functions to speed up calculations within Julia. The example demonstrates how to calculate the local, dense stiffness matrix in C++ within Julia.
