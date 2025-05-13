@@ -156,6 +156,21 @@ function iterate(M::Vector{Float64},H::Vector{Float64},Hold::Vector{Float64},Hef
     return Mnew
 end # Iteration function to find new magnetization direction
 
+function nextM(M,Heff,dt::Float64)
+    # Next step in magnetization by steepest descent
+    d::Float64 = dt/2
+    h12 = cross(M,Heff)
+
+    mat::Matrix{Float64} = [1 d*h12[3] -d*h12[2];
+                            -d*h12[3] 1 d*h12[1];
+                            d*h12[2] -d*h12[1] 1]
+       
+    Mnew = mat\(M-d*cross(M,h12))
+
+    return Mnew, M
+end # End of new magnetization from steepest descent
+
+
 function LandauLifshitz(mesh, m::Matrix{Float64}, Heff::Matrix{Float64}, H::Matrix{Float64}, Hext::Matrix{Float64},
                         Ms::Float64, Aexc::Float64, Aan::Float64, uan::Vector{Float64},
                         dt::Float64, totalTime::Float64, Vn::Vector{Float64}, nodeVolume::Vector{Float64}, scl::Float64, fixed::Vector{Int32}, free::Vector{Int32}, AD, A,
@@ -717,126 +732,121 @@ function minimalEnergy(meshSize=0,localSize=0,showGmsh=false,saveMesh=false)
     end
 
     # Rotate magnetization
+    mOld::Matrix{Float64} = m
     for i in 1:mesh.nInsideNodes
         nd = mesh.InsideNodes[i]
         m[:,nd] = iterate(m[:,nd],H[:,i],H[:,i],Heff[:,i],damp,giro,dt,precession)
     end
 
-    # M_avg::Matrix{Float64} = zeros(3,maxAtt)   
-    # E_time::Vector{Float64} = zeros(maxAtt)
-    # # torque_time::Vector{Float64} = zeros(maxAtt)
-    # for att in 1:maxAtt
+    M_avg::Matrix{Float64} = zeros(3,maxAtt)   
+    E_time::Vector{Float64} = zeros(maxAtt)
+    for att in 1:maxAtt
 
-    #     # Save previous iteration
-    #     Heff_old::Matrix{Float64} = Heff;
-    #     Hold::Matrix{Float64} = H;
+        println(att)
 
-    #     # New magnetic field
+        # Save previous iteration
+        Heff_old::Matrix{Float64} = Heff;
+        Hold::Matrix{Float64} = H;
+
+        # New magnetic field
         
-    #     # Demagnetizing field (T)
-    #     Hd = demagField(mesh,fixed,free,AD,m)
+        # Demagnetizing field (T)
+        Hd = demagField(mesh,fixed,free,AD,m)
         
-    #     # Exchange field (T)
-    #     Hexc = -2*Aexc.* (A*m[:,mesh.InsideNodes]')'
+        # Exchange field (T)
+        Hexc = -2*Aexc.* (A*m[:,mesh.InsideNodes]')'
 
-    #     # Anisotropy field (T)
-    #     Han = zeros(3,mesh.nInsideNodes)
-    #     for i in 1:mesh.nInsideNodes
-    #         nd = mesh.InsideNodes[i]
-    #         Han[:,i] = 2*Aan/Ms*dot(m[:,nd],uan).*uan
-    #     end
+        # Anisotropy field (T)
+        Han = zeros(3,mesh.nInsideNodes)
+        for i in 1:mesh.nInsideNodes
+            nd = mesh.InsideNodes[i]
+            Han[:,i] = 2*Aan/Ms*dot(m[:,nd],uan).*uan
+        end
         
-    #     # Convert to proper unis
-    #     @simd for i in 1:3
-    #         Hd[i,:]     .*= mu0*Ms./Vn
-    #         Hexc[i,:]   ./= Ms*scl^2 .*nodeVolume
-    #     end
+        # Convert to proper unis
+        @simd for i in 1:3
+            Hd[i,:]     .*= mu0*Ms./Vn
+            Hexc[i,:]   ./= Ms*scl^2 .*nodeVolume
+        end
         
-    #     # Effective field
-    #     Heff::Matrix{Float64} = Hext + Hd + Hexc + Han
+        # Effective field
+        Heff = Hext + Hd + Hexc + Han
 
-    #     # Torque term
-    #     H = zeros(3,mesh.nInsideNodes) 
-    #     for i in 1:mesh.nInsideNodes
-    #         H[:,i] = cross(m[:,i],Heff[:,i])
-    #     end
+        # Torque term
+        H = zeros(3,mesh.nInsideNodes) 
+        for i in 1:mesh.nInsideNodes
+            H[:,i] = cross(m[:,i],Heff[:,i])
+        end
 
-    #     Eext = Ed = Eexc = Ean = 0
-    #     for i in 1:mesh.nInsideNodes
-    #         Eext -= dot(m[:,i],Hext[:,i])
-    #         Ed   -= 0.5*dot(m[:,i],Hd[:,i])
-    #         Eexc -= 0.5*dot(m[:,i],Hexc[:,i])
-    #         Ean  -= 0.5*dot(m[:,i],Han[:,i])
-    #     end
-    #     E = mu0*Ms*(Eext + Ed + Eexc + Ean)
+        Eext = Ed = Eexc = Ean = 0
+        for i in 1:mesh.nInsideNodes
+            Eext -= dot(m[:,i],Hext[:,i])
+            Ed   -= 0.5*dot(m[:,i],Hd[:,i])
+            Eexc -= 0.5*dot(m[:,i],Hexc[:,i])
+            Ean  -= 0.5*dot(m[:,i],Han[:,i])
+        end
+        E = mu0*Ms*(Eext + Ed + Eexc + Ean)
 
-    #     # Get a new time step
-    #     snN::Float64  = 0
-    #     snD::Float64  = 0;
-    #     snD2 = 0;
-    #     for i = 1:mesh.nInsideNodes
-    #         nd = mesh.InsideNodes(i);
+        # Get a new time step
+        snN::Float64  = 0
+        snD::Float64  = 0;
+        snD2::Float64 = 0;
+        for i in 1:mesh.nInsideNodes
+            nd = mesh.InsideNodes[i]
             
-    #         sn = m(:,nd)-mOld(:,nd);
+            sn = m[:,nd] - mOld[:,nd]
             
-    #         gn2 = cross(m(:,nd),cross(m(:,nd),Heff(:,i)));
-    #         gn1 = cross(mOld(:,nd),cross(mOld(:,nd),Heff_old(:,i)));
+            gn2 = cross(m[:,nd],cross(m[:,nd],Heff[:,i]))
+            gn1 = cross(mOld[:,nd],cross(mOld[:,nd],Heff_old[:,i]))
 
-    #         snN  = snN + dot(sn,sn);
-    #         snD  = snD + dot(sn,gn2-gn1);
-    #         snD2 = snD2 + dot(gn2-gn1,gn2-gn1);
-    #     end
+            snN  += dot(sn,sn)
+            snD  += dot(sn,gn2-gn1);
+            snD2 += dot(gn2-gn1,gn2-gn1)
+        end
 
-    #     tau1 = snN/snD;
-    #     tau2 = snD/snD2;
+        tau1::Float64 = snN/snD
+        tau2::Float64 = snD/snD2
 
-    #     if mod(att,2) > 0
-    #         dt = tau1;
-    #     else
-    #         dt = tau2;
-    #     end
+        # Alternate between tau1 and tau2
+        if mod(att,2) > 0
+            dt = tau1
+        else
+            dt = tau2
+        end
 
-    #     if isnan(dt)
-    #         disp("tau is nan")
-    #         return
-    #     end
+        # New magnetization and check deviation
+        dm::Float64 = 0;
+        for i in 1:mesh.nInsideNodes
+            nd = mesh.InsideNodes[i]
 
-    #     % New magnetization and check deviation
-    #     dm = 0;
-    #     for i = 1:mesh.nInsideNodes
-    #         nd = mesh.InsideNodes(i);
+            m[:,nd], mOld[:,nd] = nextM(m[:,nd],Heff[:,i],dt)
+            dm = max(dm,norm(m[:,nd]-mOld[:,nd]))
+        end
 
-    #         [m(:,nd),mOld(:,nd)] = nextM(m(:,nd),Heff(:,i),dt);
-    #         dm = max(dm,norm(m(:,nd)-mOld(:,nd)));
-    #     end
+        M_avg[:,att] = mean(m[:,mesh.InsideNodes],2)
 
-    #     M_avg(:,att) = mean(m(:,mesh.InsideNodes),2);
+        if dm < maxDeviation
+            println("M is stable")
+            break
+        end
 
-    #     if dm < maxDeviation
-    #         disp("M is stable")
-    #         break
-    #     end
-    # end % End of iterative steepest descent 
+    end # End of steepest descent energy minimization
 
-    # if att == maxAtt
-    #     disp("Reached maximum attempts")
-    # end
+    M_avg   = M_avg[:,1:att]
+    E_time  = E_time[1:att]
 
-    # M_avg = M_avg(:,1:att);
-    # E = E(1:att);
+    fig = Figure()
+    ax = Axis(  fig[1,1], 
+                xlabel = "Time (ns)", 
+                ylabel = "<M> (kA/m)",
+                title = "Micromagnetic simulation")
 
-    # fig = Figure()
-    # ax = Axis(  fig[1,1], 
-    #             xlabel = "Time (ns)", 
-    #             ylabel = "<M> (kA/m)",
-    #             title = "Micromagnetic simulation")
-
-    # scatter!(ax,time,E_time, label = "Energy")
+    scatter!(ax,time,E_time, label = "Energy")
     # scatter!(ax,time,torque_time, label = "torque")
-    # axislegend() # position = :rt
+    axislegend() # position = :rt
 
-    # wait(display(fig))
-    # save("E_time.png",fig)
+    wait(display(fig))
+    save("E_time.png",fig)
 end
 
 # Run micromagnetic simulation with energy minimization by steepest descent
