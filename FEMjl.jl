@@ -70,6 +70,100 @@ function BoundaryIntegral(mesh,F,shell_id)
     return RHS
 end # Boundary conditions
 
+# Demagnetizing field
+function demagField(mesh,fixed::Vector{Int32},free::Vector{Int32},A,m::Matrix{Float64})
+    #= 
+        Calculates the demagnetizing field attributed to a magnetization field
+        using FEM and a bounding shell
+
+        Inputs:
+            mesh    (mesh data)
+            fixed   (nodes for the boundary condition magnetic scalar potential = 0)
+            free    (nodes without imposed conditions)
+            A       (Stiffness matrix)
+            m       (Magnetization vector field, 3 by mesh.nv)
+    =#
+    
+    # Load vector
+    RHS::Vector{Float64} = zeros(mesh.nv)
+    for ik in 1:mesh.nInside
+        k = mesh.InsideElements[ik]
+        nds = mesh.t[1:4,k]
+
+        # Average magnetization in the element
+        aux = mean(m[:,nds],2)
+        for i in 1:4
+            _,b,c,d = abcd(mesh.p,nds,nds[i])
+            RHS[nds[i]] += mesh.VE[k]*dot([b,c,d],aux)
+        end
+    end
+
+    u::Vector{Float64} = zeros(mesh.nv)
+    u[free] = A[free,free]\RHS[free]
+
+    # Demagnetizing field | Elements
+    Hde::Matrix{Float64} = zeros(3,mesh.nInside)
+    for ik in 1:mesh.nInside
+        k = mesh.InsideElements[ik]
+        nds = mesh.t[:,k] # all nodes of that element
+
+        # Sum the contributions
+        for ind in 1:length(nds)
+            nd = nds[ind]
+
+            # obtain the element parameters
+            _,bi,ci,di = abcd(mesh.p,nds,nd)
+
+            Hde[1,ik] -= u[nd]*bi
+            Hde[2,ik] -= u[nd]*ci
+            Hde[3,ik] -= u[nd]*di
+        end
+    end
+
+    # Demagnetizing field | Nodes
+    Hd::Matrix{Float64} = zeros(3,mesh.nv)
+    for ik in 1:mesh.nInside
+        k = mesh.InsideElements[ik]
+        nds = mesh.t[:,k]
+        Hd[:,nds] .+= mesh.VE[k]*Hde[:,ik]
+    end
+    Hd = Hd[:,mesh.InsideNodes]
+
+    return Hd
+end
+
+# ============= All-purpose functions ==================
+# Mean function
+function mean(arr::Vector,dimension=1)
+    m::Real = 0
+    for x in arr
+        m += x
+    end
+
+    return m/length(arr)
+end # End of mean for vectors
+
+function mean(arr::Matrix,dimension=1)
+    if dimension == 1 
+        d = size(arr,1)
+        m = 0 .*arr[1,:]
+        for i in 1:d
+            m .+= arr[i,:]
+        end
+
+    else
+        d = size(arr,2)
+        m = 0 .*arr[:,1]
+        for i in 1:d
+            m .+= arr[:,i]
+        end
+    end
+
+    return m./d
+end # End of mean for 2D matrices
+
+
+# ============= C/C++ interop ==============
 # Wrapper for C++ function to get local stiffness matrix 
 function CstiffnessMatrix(p::Matrix{Float64}, t::Matrix{Int32}, VE::Vector{Float64}, mu::Vector{Float64})
     # Get the matrix dimensions
