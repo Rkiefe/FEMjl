@@ -59,3 +59,7 @@ If you wish to make plots directly from this repository, run "add GLMakie" to in
 ### Running C++ variants within the Julia environment
 Recently, this repository was updated to include an example of how you can add C++ functions to speed up calculations within Julia. The example demonstrates how to calculate the local, dense stiffness matrix in C++ within Julia.
 To install, first make sure you have Eigen https://eigen.tuxfamily.org/index.php?title=Main_Page, update the FEMc.cpp in the `#include` to point to your Eigen directory and then compile the FEMc.cpp file as a shared library (`g++ -O3 -fPIC -shared -o FEMc.so FEMc.cpp`) and it is good to go.
+
+### License
+
+Distributed under the MIT License. See `LICENSE` for more information.
