@@ -398,6 +398,10 @@ mutable struct MESH
     ne::Int32           # Number of surface elements
     nInside::Int32      # Number of elements for the inside cells
     nInsideNodes::Int32 # Numberf of nodes for the inside cells
+    
+    
+    shell_id # Id of the surface boundaries of the bounding shell
+
     # Constructor
     MESH() = new()
 end
