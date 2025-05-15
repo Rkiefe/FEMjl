@@ -247,7 +247,7 @@ function main()
     E_time::Vector{Float64} = zeros(maxAtt)
     torque_time::Vector{Float64} = zeros(maxAtt)
 
-    Hold::Matrix{Float64} = H
+    Hold::Matrix{Float64} = deepcopy(H)
     
     t::Float64 = 0  # Time (s)
     it::Int32 = 0   # Iteration step
@@ -295,7 +295,7 @@ function main()
         end
 
         # Store last magnetic field
-        Hold = H
+        Hold = deepcopy(H)
 
         # Energy density
         Eext = 0
