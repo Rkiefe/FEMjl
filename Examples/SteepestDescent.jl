@@ -77,6 +77,7 @@ end # Find new magnetization after time iteration
 
 # Next step in magnetization by steepest descent
 function nextM(M::Vector{Float64},Heff::Vector{Float64},dt::Float64)
+    # Semi-implicit time step
     d::Float64 = dt/2;
     h12 = cross(M,Heff)
 
@@ -397,14 +398,23 @@ function steepestDescent(mesh, scl::Float64, m::Matrix{Float64}, Ms::Float64, Ae
     end
 
     # Make one iteration using the same approach as with relax()
-    mOld::Matrix{Float64} = m
+    mOld::Matrix{Float64} = deepcopy(m)
     for i in 1:mesh.nInsideNodes
         nd = mesh.InsideNodes[i]
-        m[:,nd] = timeStep(m[:,nd],H[:,i],H[:,i],Heff[:,i],0.01,1,1,false)
+        m[:,nd] = timeStep(m[:,nd],H[:,i],H[:,i],Heff[:,i],0.01,1.0,1.0,false)
     end
 
-
     # ------------------------------------------
+    # Average magnetization over time
+    M_avg::Matrix{Float64} = zeros(3,maxAtt)
+
+    # Energy density
+    E::Float64    = 0
+    Eext::Float64 = 0
+    Ed::Float64   = 0
+    Eexc::Float64 = 0
+    Ean::Float64  = 0
+
     E_time::Vector{Float64} = zeros(maxAtt)
     torque_time::Vector{Float64} = zeros(maxAtt)
 
@@ -422,16 +432,16 @@ function steepestDescent(mesh, scl::Float64, m::Matrix{Float64}, Ms::Float64, Ae
         Hold::Matrix{Float64} = H
 
         # New magnetic field
-        Heff::Matrix{Float64} = zeros(3,mesh.nInsideNodes) .+ mu0*Hap
+        Heff = zeros(3,mesh.nInsideNodes) .+ mu0*Hap
         
         # Demagnetizing field
-        Hd::Matrix{Float64} = demagField(mesh,fixed,free,AD,m)
+        Hd = demagField(mesh,fixed,free,AD,m)
 
         # Exchange field (T)
-        Hexc::Matrix{Float64} = -2*Aexc.* (A*m[:,mesh.InsideNodes]')'
+        Hexc = -2*Aexc.* (A*m[:,mesh.InsideNodes]')'
 
         # Anisotropy field (T)
-        Han::Matrix{Float64} = zeros(3,mesh.nInsideNodes)
+        Han = zeros(3,mesh.nInsideNodes)
         for i in 1:mesh.nInsideNodes
             nd = mesh.InsideNodes[i]
             Han[:,i] = 2*Aan/Ms*dot(m[:,nd],uan).*uan
@@ -447,7 +457,7 @@ function steepestDescent(mesh, scl::Float64, m::Matrix{Float64}, Ms::Float64, Ae
         Heff += Hd + Hexc + Han
 
         # H = Heff + damp* m cross Heff
-        H::Matrix{Float64} = zeros(3,mesh.nInsideNodes)
+        H = zeros(3,mesh.nInsideNodes)
         for i in 1:mesh.nInsideNodes
             nd = mesh.InsideNodes[i]
             H[:,i] = cross(m[:,nd],Heff[:,i])
@@ -486,7 +496,7 @@ function steepestDescent(mesh, scl::Float64, m::Matrix{Float64}, Ms::Float64, Ae
             sn::Vector{Float64} = m[:,nd] - mOld[:,nd]
             
             gn2::Vector{Float64} = cross(m[:,nd], cross(m[:,nd], Heff[:,i]))
-            gn1::Vector{Float64} = cross(mOld[:,nd], cross(mOld[:,nd],Heff_old[:,i]))
+            gn1::Vector{Float64} = cross(mOld[:,nd], cross(mOld[:,nd],HeffOld[:,i]))
 
             snN  += dot(sn,sn)
             snD  += dot(sn,gn2-gn1)
@@ -498,7 +508,7 @@ function steepestDescent(mesh, scl::Float64, m::Matrix{Float64}, Ms::Float64, Ae
 
         # Alternate between time steps
         dt::Float64 = 0
-        if mod(att,2) > 0
+        if mod(it,2) > 0
             dt = tau1
         else
             dt = tau2
@@ -521,6 +531,10 @@ function steepestDescent(mesh, scl::Float64, m::Matrix{Float64}, Ms::Float64, Ae
 
     end # End of energy minimization by steepest descent
     
+    # Remove excess zeros
+    M_avg       = M_avg[:,1:it]
+    E_time      = E_time[1:it]
+    torque_time = torque_time[1:it]
 
     return m, Heff, M_avg, E_time, torque_time, Hd, Hexc, Han, E, Ed, Eexc, Ean
 
@@ -538,7 +552,7 @@ function main()
     giro::Float64 = 2.210173e5 /mu0 # Gyromagnetic ratio (rad T-1 s-1)
     dt::Float64 = 0.028/giro        # Time step in reduced units (seconds per gyro)
     
-    maxTorque::Float64 = 1e-2       # Stop criteria of the relax function
+    maxTorque::Float64 = 1e-3       # Stop criteria of the relax function
 
     damp::Float64 = 1             # Damping parameter (dimensionless [0,1])
     precession::Bool = false         # Include precession or not
@@ -669,40 +683,38 @@ function main()
     end
     
     # Landau-Lifhitz equation
-    m, Heff, time, M_avg, E_time, torque_time, 
-    Hd, Hexc, Han, E, Ed, Eexc, Ean = relax(mesh,scl,m,Ms,Aexc,Aan,uan,Hap,dt,maxTorque,giro,damp,precession,maxAtt)
+    # m, Heff, time, M_avg, E_time, torque_time, 
+    # Hd, Hexc, Han, E, Ed, Eexc, Ean = relax(mesh,scl,m,Ms,Aexc,Aan,uan,Hap,dt,maxTorque,giro,damp,precession,maxAtt)
 
     # Steepest descent
     m, Heff, M_avg, E_time, torque_time,
-    Hd, Hexc, Han, E, Ed, Eexc, Ean = steepestDescent(mesh,scl,m,Ms,Aexc,Aan,uan,Hap,dt,maxTorque,giro,damp,precession,maxAtt)
-
+    Hd, Hexc, Han, E, Ed, Eexc, Ean = @time steepestDescent(mesh,scl,m,Ms,Aexc,Aan,uan,Hap,maxTorque,giro,maxAtt)
+    
     # Energy
-    # fig = Figure()
-    # ax = Axis(  fig[1,1], 
-    #             xlabel = "Time (ns)", 
-    #             ylabel = "Energy",
-    #             title = "Micromagnetic simulation")
-    # scatter!(ax,time,E_time) # E_time
+    fig = Figure()
+    ax = Axis(  fig[1,1], 
+                xlabel = "Time (ns)", 
+                ylabel = "Energy",
+                title = "")
+    scatter!(ax,1:length(E_time),E_time) # E_time
 
     # Log of torque
-    # fig = Figure()
-    # ax = Axis(  fig[1,1], 
-    #             xlabel = "Time (ns)", 
-    #             ylabel = "Log(Torque)",
-    #             title = "Micromagnetic simulation")
-    # scatter!(ax,time,log10.(torque_time)) # E_time
+    ax = Axis(  fig[1,2], 
+                xlabel = "Time (ns)", 
+                ylabel = "Log(Torque)",
+                title = "")
+    scatter!(ax,1:length(torque_time),log10.(torque_time)) # E_time
 
     # Magnetization
-    # fig = Figure()
-    # ax = Axis(  fig[1,1], 
-    #             xlabel = "Time (ns)", 
-    #             ylabel = "<M> (kA/m)",
-    #             title = "Micromagnetic simulation")
+    ax = Axis(  fig[1,3], 
+                xlabel = "Time (ns)", 
+                ylabel = "<M> (kA/m)",
+                title = "Average Magnetization")
 
-    # scatter!(ax,time,Ms/1000 .*M_avg[1,:], label = "M_x")
-    # scatter!(ax,time,Ms/1000 .*M_avg[2,:], label = "M_y")
-    # scatter!(ax,time,Ms/1000 .*M_avg[3,:], label = "M_z")
-    # axislegend() # position = :rt
+    scatter!(ax,1:size(M_avg,2),Ms/1000 .*M_avg[1,:], label = "M_x")
+    scatter!(ax,1:size(M_avg,2),Ms/1000 .*M_avg[2,:], label = "M_y")
+    scatter!(ax,1:size(M_avg,2),Ms/1000 .*M_avg[3,:], label = "M_z")
+    axislegend() # position = :rt
 
     wait(display(fig))
 end
