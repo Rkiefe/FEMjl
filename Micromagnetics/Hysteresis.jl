@@ -14,7 +14,7 @@ include("../FEMjl.jl")
 using GLMakie
 # ------------------------------------------
 
-include("steepestDescent.jl")
+include("SteepestDescent.jl")
 
 # ------------------------------------------
 function main()
@@ -32,10 +32,7 @@ function main()
     precession::Bool = false         # Include precession or not
 
     # Dimension of the magnetic material (rectangle)
-    L::Vector{Float64} = 
-        [512,128,30]
-        # [100,100,5]
-    
+    L::Vector{Float64} = [512,128,30]
     scl::Float64 = 1e-9                 # scale of the geometry | (m -> nm)
 
     # Conditions
@@ -153,6 +150,9 @@ function main()
         for i = 1:mesh.nInsideNodes
             nd = mesh.InsideNodes[i]
             m[:,i] = [sin(phi[i])*cos(theta[i]),sin(phi[i])*sin(theta[i]),cos(phi[i])]
+            
+            # Normalize the magnetization
+            # m[:,i] ./= norm(m[:,i])
         end
     end
     
@@ -180,7 +180,20 @@ function main()
 
     fig = Figure()
     ax = Axis(fig[1,1])
-    scatter!(ax, Hext./mu0, M_H[1,:], label = "M_x")
+    
+    i::Int32 = 1
+    j::Int32 = (0.1-0)/1e-3 + 1
+    scatter!(ax, i:j, M_H[1,i:j]) # , label = "M_x"
+    
+    i = j + 1
+    j += (0.1+0.1)/1e-3 + 1
+    scatter!(ax, i:j, M_H[2,i:j])
+
+    i = j + 1
+    j += (0.1+0.1)/1e-3 + 1
+    scatter!(ax, i:j, M_H[2,i:j])
+
+    # scatter!(ax, Hext./mu0, M_H[1,:], label = "M_x")
     # scatter!(ax, Hext./mu0, M_H[2,:], label = "M_y")
     # scatter!(ax, Hext./mu0, M_H[3,:], label = "M_z")
 
