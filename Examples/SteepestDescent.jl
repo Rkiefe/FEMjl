@@ -686,9 +686,9 @@ function main()
     # m, Heff, time, M_avg, E_time, torque_time, 
     # Hd, Hexc, Han, E, Ed, Eexc, Ean = relax(mesh,scl,m,Ms,Aexc,Aan,uan,Hap,dt,maxTorque,giro,damp,precession,maxAtt)
 
-    # Steepest descent
+    # Steepest descent energy minimization
     m, Heff, M_avg, E_time, torque_time,
-    Hd, Hexc, Han, E, Ed, Eexc, Ean = @time steepestDescent(mesh,scl,m,Ms,Aexc,Aan,uan,Hap,maxTorque,giro,maxAtt)
+    Hd, Hexc, Han, E, Ed, Eexc, Ean = steepestDescent(mesh,scl,m,Ms,Aexc,Aan,uan,Hap,maxTorque,giro,maxAtt)
     
     # Energy
     fig = Figure()
