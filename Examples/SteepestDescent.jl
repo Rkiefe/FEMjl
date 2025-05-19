@@ -12,18 +12,15 @@
 
 # ------------------------------------------
 # Gmsh powers the mesh generation and volume handling
-using Gmsh
-include("../gmsh_wrapper.jl")  # FEMjl functions to operate Gmsh and
-                            # output the mesh in a more familiar format
+include("../gmsh_wrapper.jl")   # FEMjl functions to operate Gmsh and
+                                # output the mesh in a more familiar format
 
-# Solving matrix equations and exploit the sparsity of the matrices
-using LinearAlgebra, SparseArrays
+# Include FEM functions
+include("../FEMjl.jl")
 
 # For plots
 using GLMakie
 
-# Include FEM functions
-include("../FEMjl.jl")
 # ------------------------------------------
 
 # Find new magnetization after time iteration

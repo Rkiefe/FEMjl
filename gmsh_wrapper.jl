@@ -9,6 +9,9 @@
         . Manage surface triangles and surface ID's
 =#
 
+# Gmsh powers the mesh generation and volume handling
+using Gmsh
+
 function save2file(fileName,input)
     # Saves matrix to a .txt file
     open(fileName, "w") do io
