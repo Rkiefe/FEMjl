@@ -185,6 +185,7 @@ function main()
     scatter!(ax, Hext, M_H[3,:], label = "M_z")
 
     axislegend() # position = :rt
+    save("M_H.png",fig)
     wait(display(fig))
 end
 
