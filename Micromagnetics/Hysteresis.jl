@@ -187,11 +187,11 @@ function main()
     
     i = j + 1
     j += (0.1+0.1)/1e-3 + 1
-    scatter!(ax, i:j, M_H[2,i:j])
+    scatter!(ax, i:j, M_H[1,i:j])
 
     i = j + 1
     j += (0.1+0.1)/1e-3 + 1
-    scatter!(ax, i:j, M_H[2,i:j])
+    scatter!(ax, i:j, M_H[1,i:j])
 
     # scatter!(ax, Hext./mu0, M_H[1,:], label = "M_x")
     # scatter!(ax, Hext./mu0, M_H[2,:], label = "M_y")
