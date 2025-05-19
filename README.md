@@ -16,7 +16,7 @@ This framework already has a few implementations such as `Magnetostatics` and `M
 Here is a direct output of magneticField.jl example `Magnetostatics`, the internal magnetic field of a plate aligned with the aplied field.
 ![H_plate](https://github.com/user-attachments/assets/0b03a7a4-1872-4402-a10f-1654ce149a1f)
 
-And now for a sphere. Both of these geometries were created with simple commands.
+And now for a sphere. Both of these geometries were created with simplec ommands.
 ![magneticfield_example](https://github.com/user-attachments/assets/86fc8c7c-7e8a-4f6b-a807-0df6720f1a1b)
 
 ## Functionality
