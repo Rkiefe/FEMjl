@@ -26,7 +26,7 @@ function main()
     giro::Float64 = 2.210173e5 /mu0 # Gyromagnetic ratio (rad T-1 s-1)
     dt::Float64 = 0.028/giro        # Time step in reduced units (seconds per gyro)
     
-    maxTorque::Float64 = 1e-6       # Stop criteria of the relax function
+    maxTorque::Float64 = 1e-9       # Stop criteria of the relax function
 
     damp::Float64 = 1             # Damping parameter (dimensionless [0,1])
     precession::Bool = false         # Include precession or not
@@ -196,8 +196,8 @@ function main()
     # scatter!(ax, Hext./mu0, M_H[1,:], label = "M_x")
     # scatter!(ax, Hext./mu0, M_H[2,:], label = "M_y")
     # scatter!(ax, Hext./mu0, M_H[3,:], label = "M_z")
+    # axislegend() # position = :rt
 
-    axislegend() # position = :rt
     save("M_H.png",fig)
     wait(display(fig))
 end
