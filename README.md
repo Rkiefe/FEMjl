@@ -9,11 +9,11 @@ The philosophy of this repository is to serve as a kickstart to anyone who wants
 
 ## Examples
 
-This framework already has a few implementations in the Examples folder. One of which is a fully realized micromagnetic solver, capable of simulating the time dependent magnetization, considering an external magnetic field, the demagnetizing field, the exchange field and the anisotropy field. This solver was validated against OOMMF, replicating Fig 2. of this article https://doi.org/10.1109/TMAG.2008.2001666 .
+This framework already has a few implementations such as `Magnetostatics` and `Micromagnetics`. The Micromagnetics package has two distinct functionalities, based on the Landau-Lifshitz equation: the magnetization over time of the system; and an energy minimization by the steepest descent algorithm. The solver incorporates an external magnetic field, the demagnetizing field, the exchange field and the anisotropy field. This solver was validated against OOMMF, replicating Fig 2. of this article https://doi.org/10.1109/TMAG.2008.2001666 .
 
 ![M_time](https://github.com/user-attachments/assets/1a3e17aa-ccd1-4257-994f-d04ddcff154b)
 
-Here is a direct output of magneticField.jl example `main()`, the internal magnetic field of a plate aligned with the aplied field.
+Here is a direct output of magneticField.jl example `Magnetostatics`, the internal magnetic field of a plate aligned with the aplied field.
 ![H_plate](https://github.com/user-attachments/assets/0b03a7a4-1872-4402-a10f-1654ce149a1f)
 
 And now for a sphere. Both of these geometries were created with simple commands.
