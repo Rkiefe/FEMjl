@@ -26,7 +26,7 @@ function main()
     giro::Float64 = 2.210173e5 /mu0 # Gyromagnetic ratio (rad T-1 s-1)
     dt::Float64 = 0.028/giro        # Time step in reduced units (seconds per gyro)
     
-    maxTorque::Float64 = 1e-3       # Stop criteria of the relax function
+    maxTorque::Float64 = 1e-6       # Stop criteria of the relax function
 
     damp::Float64 = 1             # Damping parameter (dimensionless [0,1])
     precession::Bool = false         # Include precession or not
@@ -39,7 +39,7 @@ function main()
     scl::Float64 = 1e-9                 # scale of the geometry | (m -> nm)
 
     # Conditions
-    Ms::Float64   = 860e3               # Magnetic saturation (A/m)
+    Ms::Float64   = 800e3               # Magnetic saturation (A/m)
     Aexc::Float64 = 13e-12              # Exchange   (J/m)
     Aan::Float64  = 0.0                 # Anisotropy (J/m3)
     uan::Vector{Float64}  = [1,0,0]     # easy axis direction
@@ -158,7 +158,7 @@ function main()
     
     # ----------------------------------------------------------------
 
-    Hext::Vector{Float64} = vcat(0:1e-3:0.1,0.1:-1e-3:-0.1,-0.1:1e-3:0.1)
+    Hext::Vector{Float64} = vcat(0:1e-3:0.1,0.1:-1e-3:-0.1,-0.1:1e-3:0.1)./mu0 # A/m
 
     # Average magnetization over different applied fields
     M_H::Matrix{Float64} = zeros(3,length(Hext))
@@ -180,9 +180,9 @@ function main()
 
     fig = Figure()
     ax = Axis(fig[1,1])
-    scatter!(ax, Hext, M_H[1,:], label = "M_x")
-    scatter!(ax, Hext, M_H[2,:], label = "M_y")
-    scatter!(ax, Hext, M_H[3,:], label = "M_z")
+    scatter!(ax, Hext./mu0, M_H[1,:], label = "M_x")
+    # scatter!(ax, Hext./mu0, M_H[2,:], label = "M_y")
+    # scatter!(ax, Hext./mu0, M_H[3,:], label = "M_z")
 
     axislegend() # position = :rt
     save("M_H.png",fig)
