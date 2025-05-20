@@ -12,15 +12,6 @@
 # Gmsh powers the mesh generation and volume handling
 using Gmsh
 
-function save2file(fileName,input)
-    # Saves matrix to a .txt file
-    open(fileName, "w") do io
-        for row in eachrow(input)
-            println(io, join(row, " , "))  # Space-separated
-        end
-    end
-end # Save matrix to .txt file
-
 # Local mesh refinement on target cell
 function refineCell(cell,localSize,meshSize)
     #=
@@ -208,6 +199,16 @@ function findNodes(mesh,region::String,id)
 
     return nodes
 end
+
+# Save matrix to .txt file
+function save2file(fileName,input)
+    # Saves matrix to a .txt file
+    open(fileName, "w") do io
+        for row in eachrow(input)
+            println(io, join(row, " , "))  # Space-separated
+        end
+    end
+end # Save matrix to .txt file
 
 function Mesh(cells,meshSize=0,localSize=0,saveMesh=false)
     #=
@@ -409,3 +410,21 @@ mutable struct MESH
     MESH() = new()
 end
 
+# View the mesh using Makie
+function viewMesh(mesh::MESH)
+    fig = Figure()
+    ax = Axis3(fig[1, 1], aspect=:data, title="")
+    
+    # Convert surface triangles to Makie format
+    faces = [GLMakie.GLTriangleFace(mesh.surfaceT[1,i], 
+                                    mesh.surfaceT[2,i], 
+                                    mesh.surfaceT[3,i]) for i in 1:size(mesh.surfaceT,2)]
+    
+    # Create mesh plot using surface triangles
+    mesh!(ax, mesh.p', faces,
+            color=:lightblue,
+            transparency=true,
+            alpha=0.3)
+
+    wait(display(fig))
+end # View the mesh using Makie

@@ -32,24 +32,6 @@ using LinearAlgebra, SparseArrays
 # For plots
 using GLMakie
 
-# View the mesh processed by FEMjl, generated with gmsh, using Makie
-function viewMesh(mesh)
-    fig = Figure()
-    ax = Axis3(fig[1, 1], aspect=:data, title="")
-    
-    # Convert surface triangles to Makie format
-    faces = [GLMakie.GLTriangleFace(mesh.surfaceT[1,i], 
-                                    mesh.surfaceT[2,i], 
-                                    mesh.surfaceT[3,i]) for i in 1:size(mesh.surfaceT,2)]
-    
-    # Create mesh plot using surface triangles
-    mesh!(ax, mesh.p', faces,
-            color=:lightblue,
-            transparency=true,
-            alpha=0.3)
-
-    wait(display(fig))
-end # View the mesh using Makie
 
 # Main function | Generates a geometry and mesh
 function main(meshSize=0,localSize=0,showGmsh=false,saveMesh=false)
@@ -61,9 +43,11 @@ function main(meshSize=0,localSize=0,showGmsh=false,saveMesh=false)
     gmsh.initialize()
 
     # >> Model
+    L::Vector{Float64} = [512,128,30]
+
     # Create an empty container
-    container = addCuboid([0,0,0],[4,4,4])
-    # container = addSphere([0,0,0],4)
+    # container = addCuboid([0,0,0],[4,4,4])
+    container = addSphere([0,0,0],5*maximum(L))
 
     # Get how many surfaces compose the bounding shell
     temp = gmsh.model.getEntities(2)            # Get all surfaces of current model
@@ -75,7 +59,7 @@ function main(meshSize=0,localSize=0,showGmsh=false,saveMesh=false)
     # Add another object inside the container
     
     # addSphere([0,0,0],0.5,cells,true)
-    addCuboid([0,0,0],[1.65,1.65,0.04],cells,true)
+    addCuboid([0,0,0],L,cells,true)
 
     # Fragment to make a unified geometry
     _, fragments = gmsh.model.occ.fragment([(3, container)], cells)
@@ -187,10 +171,10 @@ function NoBoundingShell(showGmsh)
 end
 
 
-meshSize = 10
-localSize = 0.1
+meshSize = 500
+localSize = 5
 showGmsh = false
-saveMesh = false
+saveMesh = true
 
 main(meshSize,localSize,showGmsh,saveMesh)
 # geometryFromCAD()

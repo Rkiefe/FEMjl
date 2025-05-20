@@ -66,15 +66,15 @@ end # Find new magnetization after time iteration
 
 # ------------------------------------------
 function main()
-    meshSize::Float64 = 200
+    meshSize::Float64 = 400
     localSize::Float64 = 5
 
     # Constants
     mu0::Float64 = pi*4e-7          # vacuum magnetic permeability
     giro::Float64 = 2.210173e5 /mu0 # Gyromagnetic ratio (rad T-1 s-1)
-    dt::Float64 = 0.028/giro        # Time step in reduced units (seconds per gyro)
-    totalTime::Float64 = 0.4        # Total time of spin dynamics simulation (ns)
-    damp::Float64 = 0.1             # Damping parameter (dimensionless [0,1])
+    dt::Float64 = 1e-12             # Time step (s)
+    totalTime::Float64 = 0.1        # Total time of spin dynamics simulation (ns)
+    damp::Float64 = 0.0             # Damping parameter (dimensionless [0,1])
     precession::Bool = true         # Include precession or not
 
     # Dimension of the magnetic material (rectangle)
@@ -82,15 +82,15 @@ function main()
     scl::Float64 = 1e-9                 # scale of the geometry | (m -> nm)
     
     # Conditions
-    Ms::Float64   = 860e3              # Magnetic saturation (A/m)
-    Aexc::Float64 = 13e-12             # Exchange   (J/m)
-    Aan::Float64  = 0.0                # Anisotropy (J/m3)
-    uan::Vector{Float64}  = [1,0,0]    # easy axis direction
-    Hap::Vector{Float64}  = [0,50e3,0] # A/m
+    Ms::Float64   = 1400e3              # Magnetic saturation (A/m)
+    Aexc::Float64 = 0                   # Exchange   (J/m)
+    Aan::Float64  = 500e3               # Anisotropy (J/m3)
+    uan::Vector{Float64}  = [1,0,0]     # easy axis direction
+    Hap::Vector{Float64}  = [0,400e3,0] # A/m
 
     # Convergence criteria
-    maxDeviation::Float64 = 1e-5     # Maximum difference between current and previous <M>
-    maxAtt::Int32 = Int(1e4)         # max number of iterations for the LL solver
+    maxDeviation::Float64 = 0        # Maximum difference between current and previous <M>
+    maxAtt::Int32 = floor((1e-9 *totalTime)/dt + 1)         # max number of iterations for the LL solver
 
     # Create a geometry
     # ------------------------------------------
@@ -98,7 +98,8 @@ function main()
 
     # >> Model
     # Create an empty container
-    container = addSphere([0,0,0],5*maximum(L))
+    # container = addSphere([0,0,0],5*maximum(L))
+    container = addSphere([0,0,0],20*50)
     cells = [] # List of cells inside the container
 
     # Get how many surfaces compose the bounding shell
@@ -106,7 +107,8 @@ function main()
     bounding_shell_n_surfaces = 1:length(temp)      # Get the number of surfaces in the bounding shell
 
     # Add another object inside the container
-    addCuboid([0,0,0],L,cells,true)
+    # addCuboid([0,0,0],L,cells,true)
+    addSphere([0,0,0],50,cells,true)
 
     # Fragment to make a unified geometry
     _, fragments = gmsh.model.occ.fragment([(3, container)], cells)
@@ -116,7 +118,7 @@ function main()
     container = fragments[1][1][2]
 
     # Generate Mesh
-    mesh = Mesh(cells,meshSize,localSize,false)
+    mesh = Mesh(cells,meshSize,localSize,true)
     
     # Get bounding shell surface id
     shell_id = gmsh.model.getAdjacencies(3, container)[2]
@@ -131,6 +133,9 @@ function main()
     println("Number of nodes ",size(mesh.p,2))
     println("Number of Inside nodes ",length(mesh.InsideNodes))
     println("Number of surface elements ",size(mesh.surfaceT,2))
+    println("Bounding shell: ",shell_id)
+
+    viewMesh(mesh)
     # ------------------------------------------
 
     # Volume of elements of each mesh node | Needed for the demagnetizing field
@@ -190,10 +195,10 @@ function main()
 
     # Magnetization field
     m::Matrix{Float64} = zeros(3,mesh.nv)
-    for i = 1:mesh.nInsideNodes
-        nd = mesh.InsideNodes[i]
-        m[1,i] = 1
-    end
+    m[1,mesh.InsideNodes] .= 1
+    # for i in mesh.InsideNodes
+        # m[1,i] = 1
+    # end
 
     # Magnetic fields
     Heff::Matrix{Float64} = zeros(3,mesh.nInsideNodes) .+ mu0*Hap
@@ -247,10 +252,13 @@ function main()
     
     t::Float64 = 0  # Time (s)
     it::Int32 = 0   # Iteration step
-    while 1e9*t < totalTime && it < maxAtt
+    @time while 1e9*t < totalTime
         t += dt
         it += 1
-        println(1e9 * t)
+        
+        if mod(it,50) < 1
+            println("t (ns): ",t*1e9)
+        end  
 
         # New magnetization
         for i in 1:mesh.nInsideNodes
@@ -335,8 +343,8 @@ function main()
                 title = "Micromagnetic simulation")
 
     scatter!(ax,time,Ms/1000 .*M_avg[1,:], label = "M_x")
-    scatter!(ax,time,Ms/1000 .*M_avg[2,:], label = "M_y")
-    scatter!(ax,time,Ms/1000 .*M_avg[3,:], label = "M_z")
+    # scatter!(ax,time,Ms/1000 .*M_avg[2,:], label = "M_y")
+    # scatter!(ax,time,Ms/1000 .*M_avg[3,:], label = "M_z")
     axislegend() # position = :rt
 
     wait(display(fig))

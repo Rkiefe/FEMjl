@@ -90,15 +90,15 @@ function main(meshSize=0,localSize=0,showGmsh=true,saveMesh=false)
     Hext = [1,0,0]     # T
     
     # Relative magnetic permeability
-    permeability::Float64 = 3
+    permeability::Float64 = 1+2
 
     # Create a geometry
     gmsh.initialize()
 
     # >> Model
     # Create an empty container
-    # container = addCuboid([0,0,0],[4,4,4])
-    container = addSphere([0,0,0],4)
+    # container = addCuboid([0,0,0],[5,5,5])
+    container = addSphere([0,0,0],5)
 
     # Get how many surfaces compose the bounding shell
     temp = gmsh.model.getEntities(2)            # Get all surfaces of current model
@@ -109,8 +109,8 @@ function main(meshSize=0,localSize=0,showGmsh=true,saveMesh=false)
     cells = []
 
     # Add another object inside the container
-    # addSphere([0,0,0],0.5,cells)
-    addCuboid([0,0,0],[1.65,1.65,0.04],cells,true)
+    addSphere([0,0,0],1,cells,true)
+    # addCuboid([0,0,0],[1.65,1.65,0.04],cells,true)
 
 
     # Fragment to make a unified geometry
@@ -139,7 +139,8 @@ function main(meshSize=0,localSize=0,showGmsh=true,saveMesh=false)
     println("Number of nodes ",size(mesh.p,2))
     println("Number of Inside nodes ",length(mesh.InsideNodes))
     println("Number of surface elements ",size(mesh.surfaceT,2))
-
+    println("Bounding shell: ",shell_id)
+    
     # View the mesh using Julia instead of Gmsh
     viewMesh(mesh)
 
@@ -223,6 +224,22 @@ function main(meshSize=0,localSize=0,showGmsh=true,saveMesh=false)
 
     # Plot result | Uncomment "using GLMakie"
     plotHField(mesh,centroids,H,true)
+
+    # Analytic result
+    S::Vector{Float64} = zeros(mesh.nInside)
+    dif::Float64 = 0.0  # Average difference
+    v::Float64 = 0      # Total mesh volume of magnetic region
+    for ik in 1:mesh.nInside
+        k = mesh.InsideElements[ik]
+        v += mesh.VE[k]
+
+        S[ik] = (3*chi[k]/(3+chi[k]))*norm(Hext)
+        
+        dif += 100*abs(S[ik]-M[ik])/S[ik] *mesh.VE[k]
+    end
+
+    println("100*|M - Manalytic|/M_an.. = ",dif/v," %")
+
 
 end # end of main
 

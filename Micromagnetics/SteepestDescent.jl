@@ -276,6 +276,7 @@ function relax(mesh, scl::Float64, m::Matrix{Float64}, Ms::Float64, Aexc::Float6
             dtau += norm(cross(m[:,mesh.InsideNodes[i]],Heff[:,i]))
         end
         torque_time[it] = dtau/mesh.nInsideNodes
+        
         # Average magnetization
         M_avg[:,it] = mean(m[:,mesh.InsideNodes],2)
 
