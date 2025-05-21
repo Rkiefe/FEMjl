@@ -1,5 +1,9 @@
-# A simple interpolation method to interpolate 1D data
-
+#= 
+	A simple interpolation method to interpolate 1D data
+	It mimics the matlab implementation of interp1
+	
+	Should be expanded to include interp2
+=#
 module interp
 export interp1
 
