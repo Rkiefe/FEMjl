@@ -78,7 +78,7 @@ function main()
     precession::Bool = true         # Include precession or not
 
     # Dimension of the magnetic material (rectangle)
-    L::Vector{Float64} = [100,100,5]
+    # L::Vector{Float64} = [100,100,5]
     scl::Float64 = 1e-9                 # scale of the geometry | (m -> nm)
     
     # Conditions
@@ -100,6 +100,7 @@ function main()
     # Create an empty container
     # container = addSphere([0,0,0],5*maximum(L))
     container = addSphere([0,0,0],20*50)
+
     cells = [] # List of cells inside the container
 
     # Get how many surfaces compose the bounding shell
