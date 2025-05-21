@@ -32,7 +32,7 @@ function abcd(p::Matrix{Float64},nodes::Vector{Int32},nd::Int32)
 end # Basis function coef.
 
 # Dense, local stiffness matrix
-function localStiffnessMatrix(mesh,f::Vector{Float64})
+function localStiffnessMatrix(mesh::MESH,f::Vector{Float64})
     Ak::Matrix{Float64} = zeros(4*4,mesh.nt)
     b::Vector{Float64} = zeros(4)
     c::Vector{Float64} = zeros(4)
@@ -52,7 +52,7 @@ end # Local stiffnessmatrix in 100% Julia
 
 
 # Sparse, global stiffness matrix
-function stiffnessMatrix(mesh,f::Vector{Float64}=ones(mesh.nt))
+function stiffnessMatrix(mesh::MESH,f::Vector{Float64}=ones(mesh.nt))
     A = spzeros(mesh.nv,mesh.nv)
 
     # Local stiffness matrix
@@ -71,7 +71,7 @@ function stiffnessMatrix(mesh,f::Vector{Float64}=ones(mesh.nt))
 end # Sparse, global stiffness matrix
 
 # Lagrange multiplier technique
-function lagrange(mesh)
+function lagrange(mesh::MESH)
     C = zeros(mesh.nv,1);
     for k in 1:mesh.nt
         nds::AbstractVector{Int32} = @view mesh.t[:,k];   # Nodes of that element
@@ -85,7 +85,7 @@ function lagrange(mesh)
 end # Lagrange multiplier technique
 
 # Boundary condition
-function BoundaryIntegral(mesh,F,shell_id)
+function BoundaryIntegral(mesh::MESH,F,shell_id)
     RHS = zeros(mesh.nv,1);
     for s in 1:mesh.ne
 
@@ -107,7 +107,7 @@ function BoundaryIntegral(mesh,F,shell_id)
 end # Boundary conditions
 
 # Demagnetizing field
-function demagField(mesh,fixed::Vector{Int32},free::Vector{Int32},A,m::Matrix{Float64})
+function demagField(mesh::MESH,fixed::Vector{Int32},free::Vector{Int32},A,m::Matrix{Float64})
     #= 
         Calculates the demagnetizing field attributed to a magnetization field
         using FEM and a bounding shell

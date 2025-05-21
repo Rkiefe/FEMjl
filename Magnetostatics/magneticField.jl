@@ -19,17 +19,15 @@ using Gmsh
 include("../gmsh_wrapper.jl")  # FEMjl functions to operate Gmsh and
                             # output the mesh in a more familiar format
 
-# Required for solving matrix equations and exploit the sparsity of the matrices
-using LinearAlgebra, SparseArrays
+# Include FEM functions
+include("../FEMjl.jl")
 
 # For plots
 using GLMakie
 
-# Include FEM functions
-include("../FEMjl.jl")
 
 # Scatter plot of magnetic field
-function plotHField(mesh,centroids::Matrix{Float64},H::Vector{Float64},saveFigure)
+function plotHField(mesh::MESH,centroids::Matrix{Float64},H::Vector{Float64},saveFigure)
     fig = Figure()
     ax = Axis3(fig[1, 1], aspect = :data, title="Magnetic field H")
 
