@@ -66,7 +66,7 @@ end # Find new magnetization after time iteration
 
 # ------------------------------------------
 function main()
-    meshSize::Float64 = 400
+    meshSize::Float64 = 200
     localSize::Float64 = 5
 
     # Constants
@@ -99,7 +99,7 @@ function main()
     # >> Model
     # Create an empty container
     # container = addSphere([0,0,0],5*maximum(L))
-    container = addSphere([0,0,0],20*50)
+    container = addSphere([0,0,0],5*50)
 
     cells = [] # List of cells inside the container
 
@@ -136,7 +136,8 @@ function main()
     println("Number of surface elements ",size(mesh.surfaceT,2))
     println("Bounding shell: ",shell_id)
 
-    viewMesh(mesh)
+    # viewMesh(mesh)
+    # return
     # ------------------------------------------
 
     # Volume of elements of each mesh node | Needed for the demagnetizing field
