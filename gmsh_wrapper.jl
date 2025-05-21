@@ -369,11 +369,6 @@ function elementVolume(p,nds)
     return volume
 end # Mesh element volume
 
-function areaTriangle(xt,yt,zt)
-    Atr = 0.5*sqrt(det([xt';yt';[1 1 1]])^2 + det([yt';zt';[1 1 1]])^2 + det([zt';xt';[1 1 1]])^2);
-    return Atr
-end # Area of the 3D triangle
-
 # Holds the mesh information needed for FEM simulations
 mutable struct MESH
     # Node coordinates
