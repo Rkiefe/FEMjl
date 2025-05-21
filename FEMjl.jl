@@ -1,3 +1,17 @@
+#=
+    This file holds the Finite-Element related logic
+
+    abcd                 -> gets the linear basis function, f = a + bx + cy + dz
+    stiffnessMatrix      -> the global stiffness matrix (sparse)
+    lagrange             -> Calculates the volume integral of the basis function,
+                            used for the Lagrange multiplier technique
+    BoundaryIntegral     -> The surface integral of a vector field dot surface normal
+    demagField           -> Calculates the demagnetizing field of a magnetization field
+    mean                 -> Replicates the matlab 'mean' function
+    CstiffnessMatrix     -> Calculates the local stiffness matrix in C++
+    localstiffnessmatrix -> Dense, local stiffness matrix in Julia
+=#
+
 using LinearAlgebra, SparseArrays
 
 # FEM linear basis function
@@ -16,6 +30,26 @@ function abcd(p::Matrix{Float64},nodes::Vector{Int32},nd::Int32)
 
     return r[1],r[2],r[3],r[4] # f= a + bx + cy + dz
 end # Basis function coef.
+
+# Dense, local stiffness matrix
+function localStiffnessMatrix(mesh,f::Vector{Float64})
+    Ak::Matrix{Float64} = zeros(4*4,mesh.nt)
+    b::Vector{Float64} = zeros(4)
+    c::Vector{Float64} = zeros(4)
+    d::Vector{Float64} = zeros(4)
+    aux::Matrix{Float64} = zeros(4,4)
+    
+    for k in 1:mesh.nt
+        for i in 1:4
+            _,b[i],c[i],d[i] = abcd(mesh.p,mesh.t[:,k],mesh.t[i,k])
+        end
+        aux = mesh.VE[k]*f[k]*(b*b' + c*c' + d*d')
+        Ak[:,k] = aux[:] # vec(aux)
+    end
+
+    return Ak
+end # Local stiffnessmatrix in 100% Julia
+
 
 # Sparse, global stiffness matrix
 function stiffnessMatrix(mesh,f::Vector{Float64}=ones(mesh.nt))
@@ -180,22 +214,3 @@ function CstiffnessMatrix(p::Matrix{Float64}, t::Matrix{Int32}, VE::Vector{Float
 
     return Ak
 end # Wrapper for C++ function to get local stiffness matrix 
-
-# Local stiffnessmatrix in 100% Julia
-function localStiffnessMatrix(mesh,f::Vector{Float64})
-    Ak::Matrix{Float64} = zeros(4*4,mesh.nt)
-    b::Vector{Float64} = zeros(4)
-    c::Vector{Float64} = zeros(4)
-    d::Vector{Float64} = zeros(4)
-    aux::Matrix{Float64} = zeros(4,4)
-    
-    for k in 1:mesh.nt
-        for i in 1:4
-            _,b[i],c[i],d[i] = abcd(mesh.p,mesh.t[:,k],mesh.t[i,k])
-        end
-        aux = mesh.VE[k]*f[k]*(b*b' + c*c' + d*d')
-        Ak[:,k] = aux[:] # vec(aux)
-    end
-
-    return Ak
-end # Local stiffnessmatrix in 100% Julia
