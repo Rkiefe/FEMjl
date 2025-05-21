@@ -245,6 +245,7 @@ function Mesh(cells,meshSize=0,localSize=0,saveMesh=false)
     end
 
     # Generate mesh
+    # gmsh.option.setNumber("Mesh.Algorithm",6)
     gmsh.model.mesh.generate(3)
     gmsh.model.mesh.optimize("Netgen") # Optimize the mesh
 
