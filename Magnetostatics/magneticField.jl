@@ -28,25 +28,6 @@ using GLMakie
 # Include FEM functions
 include("../FEMjl.jl")
 
-# View the mesh processed by FEMjl, generated with gmsh, using Makie
-function viewMesh(mesh)
-    fig = Figure()
-    ax = Axis3(fig[1, 1], aspect=:data, title="")
-    
-    # Convert surface triangles to Makie format
-    faces = [GLMakie.GLTriangleFace(mesh.surfaceT[1,i], 
-                                    mesh.surfaceT[2,i], 
-                                    mesh.surfaceT[3,i]) for i in 1:size(mesh.surfaceT,2)]
-    
-    # Create mesh plot using surface triangles
-    mesh!(ax, mesh.p', faces,
-            color=:lightblue,
-            transparency=true,
-            alpha=0.3)
-
-    wait(display(fig))
-end # View the mesh using Makie
-
 # Scatter plot of magnetic field
 function plotHField(mesh,centroids::Matrix{Float64},H::Vector{Float64},saveFigure)
     fig = Figure()
