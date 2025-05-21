@@ -1,3 +1,8 @@
+/*
+	Calculates the dense, local stiffness matrix
+	Also contains a wrapper to be called by Julia
+*/
+
 #include <iostream>	
 #include <vector>
 #include <omp.h>
