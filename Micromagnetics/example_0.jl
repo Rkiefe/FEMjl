@@ -25,8 +25,8 @@ function main()
     damp::Float64 = 0.0             # Damping parameter (dimensionless [0,1])
     precession::Bool = true         # Include precession or not
 
-    # Dimension of the magnetic material (rectangle)
-    # L::Vector{Float64} = [100,100,5]
+    # Dimension of the magnetic material 
+    # L::Vector{Float64} = [100,100,5]  # (rectangle)
     scl::Float64 = 1e-9                 # scale of the geometry | (m -> nm)
     
     # Conditions
@@ -40,54 +40,53 @@ function main()
     maxTorque::Float64 = 0        # Maximum difference between current and previous <M>
     maxAtt::Int32 = 10_000             # Maximum number of iterations in the solver
     
-    # Create a geometry
-    # ------------------------------------------
-    gmsh.initialize()
+    # -- Create a geometry --
+        gmsh.initialize()
 
-    # >> Model
-    # Create an empty container
-    # container = addSphere([0,0,0],5*maximum(L))
-    container = addSphere([0,0,0],5*50)
+        # >> Model
+        # Create an empty container
+        container = addSphere([0,0,0],5*50)
 
-    cells = [] # List of cells inside the container
+        cells = [] # List of cells inside the container
 
-    # Get how many surfaces compose the bounding shell
-    temp = gmsh.model.getEntities(2)                # Get all surfaces of current model
-    bounding_shell_n_surfaces = 1:length(temp)      # Get the number of surfaces in the bounding shell
+        # Get how many surfaces compose the bounding shell
+        temp = gmsh.model.getEntities(2)                # Get all surfaces of current model
+        bounding_shell_n_surfaces = 1:length(temp)      # Get the number of surfaces in the bounding shell
 
-    # Add another object inside the container
-    # addCuboid([0,0,0],L,cells,true)
-    addSphere([0,0,0],50,cells,true)
+        # Add another object inside the container
+        # addCuboid([0,0,0],L,cells,true)
+        addSphere([0,0,0],50,cells,true)
 
-    # Fragment to make a unified geometry
-    _, fragments = gmsh.model.occ.fragment([(3, container)], cells)
-    gmsh.model.occ.synchronize()
+        # Fragment to make a unified geometry
+        _, fragments = gmsh.model.occ.fragment([(3, container)], cells)
+        gmsh.model.occ.synchronize()
 
-    # Update container volume ID
-    container = fragments[1][1][2]
+        # Update container volume ID
+        container = fragments[1][1][2]
 
-    # Generate Mesh
-    mesh = Mesh(cells,meshSize,localSize,false)
-    
-    # Get bounding shell surface id
-    mesh.shell_id = gmsh.model.getAdjacencies(3, container)[2]
+        # Generate Mesh
+        mesh = Mesh(cells,meshSize,localSize,false)
+        
+        # Get bounding shell surface id
+        mesh.shell_id = gmsh.model.getAdjacencies(3, container)[2]
 
-    # Must remove the surface Id of the interior surfaces
-    mesh.shell_id = mesh.shell_id[bounding_shell_n_surfaces] # All other, are interior surfaces
+        # Must remove the surface Id of the interior surfaces
+        mesh.shell_id = mesh.shell_id[bounding_shell_n_surfaces] # All other, are interior surfaces
 
-    # Finalize Gmsh and show mesh properties
-    # gmsh.fltk.run()
-    gmsh.finalize()
-
-    # # Load mesh from matlab
-    # mesh = MESH()
-    # mesh.t = readdlm("mesh/t.txt",','); mesh.nt = size(mesh.t,2)
-    # mesh.p = readdlm("mesh/p.txt",','); mesh.nv = size(mesh.p,2)
-    # mesh.surfaceT = readdlm("mesh/surfaceT.txt",','); mesh.ne = size(mesh.surfaceT,2)
-    # mesh.InsideElements = vec(readdlm("mesh/InsideElements.txt",',')); mesh.nInside = length(mesh.InsideElements)
-    # mesh.InsideNodes = vec(readdlm("mesh/InsideNodes.txt",',')); mesh.nInsideNodes = length(mesh.InsideNodes)
-    # mesh.VE = vec(readdlm("mesh/VE.txt",','))
-    # shell_id = [1] 
+        # Finalize Gmsh and show mesh properties
+        # gmsh.fltk.run()
+        gmsh.finalize()
+        
+        # Or load mesh from matlab
+        # mesh = MESH()
+        # mesh.t = readdlm("mesh/t.txt",','); mesh.nt = size(mesh.t,2)
+        # mesh.p = readdlm("mesh/p.txt",','); mesh.nv = size(mesh.p,2)
+        # mesh.surfaceT = readdlm("mesh/surfaceT.txt",','); mesh.ne = size(mesh.surfaceT,2)
+        # mesh.InsideElements = vec(readdlm("mesh/InsideElements.txt",',')); mesh.nInside = length(mesh.InsideElements)
+        # mesh.InsideNodes = vec(readdlm("mesh/InsideNodes.txt",',')); mesh.nInsideNodes = length(mesh.InsideNodes)
+        # mesh.VE = vec(readdlm("mesh/VE.txt",','))
+        # shell_id = [1] 
+    # -----------------------
 
     println("Number of elements ",size(mesh.t,2))
     println("Number of Inside elements ",length(mesh.InsideElements))
@@ -97,7 +96,6 @@ function main()
     # println("Bounding shell: ",mesh.shell_id)
 
     # viewMesh(mesh)
-    # return
     
     # Magnetization field
     m::Matrix{Float64} = zeros(3,mesh.nv)
