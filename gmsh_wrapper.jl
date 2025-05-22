@@ -36,13 +36,23 @@ function refineCell(cell,localSize,meshSize)
     gmsh.model.mesh.field.setNumber(threshold_field, "LcMin", localSize)
     gmsh.model.mesh.field.setNumber(threshold_field, "LcMax", meshSize)
     gmsh.model.mesh.field.setNumber(threshold_field, "DistMin", 0)
+    gmsh.model.mesh.field.setNumber(threshold_field, "DistMax", meshSize)   # Full refinement up to this distance
 
-    # Use the minimum of all the fields as the background mesh field
-    min_field = gmsh.model.mesh.field.add("Min")
-    gmsh.model.mesh.field.setNumbers(min_field, "FieldsList", [threshold_field])
+    # Adds a smoother element size transition (if set to 1)
+    gmsh.model.mesh.field.setNumber(threshold_field, "Sigmoid", 0) # 0 -> linear; 1 -> sigmoid
+
+    # Set this if you don't want to preserve the boundary shape
+    # gmsh.option.setNumber("Mesh.MeshSizeExtendFromBoundary", 0) 
+
 
     # Set the background mesh field
-    gmsh.model.mesh.field.setAsBackgroundMesh(min_field)
+    gmsh.model.mesh.field.setAsBackgroundMesh(threshold_field)
+
+    # -- Use the minimum of all the fields as the background mesh field --
+    # min_field = gmsh.model.mesh.field.add("Min")
+    # gmsh.model.mesh.field.setNumbers(min_field, "FieldsList", [threshold_field])
+    # gmsh.model.mesh.field.setAsBackgroundMesh(min_field)
+
 end # Local mesh refinement on target cell
 
 # Make a cuboid based on its center
