@@ -147,12 +147,12 @@ function main()
     begin # Set the initial magnetization
         theta::Vector{Float64} = 2*pi*rand(mesh.nInsideNodes)
         phi::Vector{Float64} = pi*rand(mesh.nInsideNodes)
-        for i = 1:mesh.nInsideNodes
+        for i in 1:mesh.nInsideNodes
             nd = mesh.InsideNodes[i]
-            m[:,i] = [sin(phi[i])*cos(theta[i]),sin(phi[i])*sin(theta[i]),cos(phi[i])]
+            m[:,nd] = [sin(phi[i])*cos(theta[i]),sin(phi[i])*sin(theta[i]),cos(phi[i])]
             
             # Normalize the magnetization
-            # m[:,i] ./= norm(m[:,i])
+            m[:,nd] ./= norm(m[:,nd])
         end
     end
     
