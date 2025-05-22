@@ -11,13 +11,10 @@ include("../gmsh_wrapper.jl")  # FEMjl functions to operate Gmsh and
 # Include FEM functions
 include("../FEMjl.jl")
 
-# For plots
-using GLMakie
 
-# For testing with matlab mesh
-using DelimitedFiles
+# # For testing with matlab mesh
+# using DelimitedFiles
 
-# ------------------------------------------
 
 # Find new magnetization after time iteration
 function timeStep(m,H,Hold,Heff,dt,giro,damp::Float64=1,precession::Bool=true)
@@ -68,191 +65,104 @@ function timeStep(m,H,Hold,Heff,dt,giro,damp::Float64=1,precession::Bool=true)
     return m2
 end # Find new magnetization after time iteration
 
-# ------------------------------------------
-function main()
-    meshSize::Float64 = 20
-    localSize::Float64 = 0
-
-    # Constants
+# Solves the Landau-Lifshitz equation
+function LandauLifshitz(mesh::MESH, scl::Float64, m::Matrix{Float64}, Ms::Float64, Aexc::Float64, Aan::Float64, uan::Vector{Float64}, Hap::Vector{Float64}, dt::Float64, giro::Float64, damp::Float64=1, precession::Bool=true, maxTorque::Float64=0.0, maxAtt::Int32=10_000, totalTime::Float64=Inf)
+    #= 
+        Solves the Landau-Lifshitz equation
+    =#
     mu0::Float64 = pi*4e-7          # vacuum magnetic permeability
-    giro::Float64 = 2.210173e5 /mu0 # Gyromagnetic ratio (rad T-1 s-1)
-    dt::Float64 = 1e-12             # Time step (s)
-    totalTime::Float64 = 0.1        # Total time of spin dynamics simulation (ns)
-    damp::Float64 = 0.0             # Damping parameter (dimensionless [0,1])
-    precession::Bool = true         # Include precession or not
 
-    # Dimension of the magnetic material (rectangle)
-    # L::Vector{Float64} = [100,100,5]
-    scl::Float64 = 1e-9                 # scale of the geometry | (m -> nm)
-    
-    # Conditions
-    Ms::Float64   = 1400e3              # Magnetic saturation (A/m)
-    Aexc::Float64 = 0                   # Exchange   (J/m)
-    Aan::Float64  = 500e3               # Anisotropy (J/m3)
-    uan::Vector{Float64}  = [1,0,0]     # easy axis direction
-    Hap::Vector{Float64}  = [0,400e3,0] # A/m
-
-    # Convergence criteria
-    maxDeviation::Float64 = 0        # Maximum difference between current and previous <M>
-    maxAtt::Int32 = floor((1e-9 *totalTime)/dt + 1)         # max number of iterations for the LL solver
-
-    # Create a geometry
-    # ------------------------------------------
-    gmsh.initialize()
-
-    # >> Model
-    # Create an empty container
-    # container = addSphere([0,0,0],5*maximum(L))
-    container = addSphere([0,0,0],5*50)
-
-    cells = [] # List of cells inside the container
-
-    # Get how many surfaces compose the bounding shell
-    temp = gmsh.model.getEntities(2)                # Get all surfaces of current model
-    bounding_shell_n_surfaces = 1:length(temp)      # Get the number of surfaces in the bounding shell
-
-    # Add another object inside the container
-    # addCuboid([0,0,0],L,cells,true)
-    addSphere([0,0,0],50,cells,true)
-
-    # Fragment to make a unified geometry
-    _, fragments = gmsh.model.occ.fragment([(3, container)], cells)
-    gmsh.model.occ.synchronize()
-
-    # Update container volume ID
-    container = fragments[1][1][2]
-
-    # Generate Mesh
-    mesh = Mesh(cells,meshSize,localSize,false)
-    
-    # Get bounding shell surface id
-    shell_id = gmsh.model.getAdjacencies(3, container)[2]
-
-    # Must remove the surface Id of the interior surfaces
-    shell_id = shell_id[bounding_shell_n_surfaces] # All other, are interior surfaces
-
-
-    # Finalize Gmsh and show mesh properties
-    # gmsh.fltk.run()
-    gmsh.finalize()
-
-    # Load mesh from matlab
-    # mesh = MESH()
-    # mesh.t = readdlm("mesh/t.txt",','); mesh.nt = size(mesh.t,2)
-    # mesh.p = readdlm("mesh/p.txt",','); mesh.nv = size(mesh.p,2)
-    # mesh.surfaceT = readdlm("mesh/surfaceT.txt",','); mesh.ne = size(mesh.surfaceT,2)
-    # mesh.InsideElements = vec(readdlm("mesh/InsideElements.txt",',')); mesh.nInside = length(mesh.InsideElements)
-    # mesh.InsideNodes = vec(readdlm("mesh/InsideNodes.txt",',')); mesh.nInsideNodes = length(mesh.InsideNodes)
-    # mesh.VE = vec(readdlm("mesh/VE.txt",','))
-    # shell_id = [1] 
-
-    println("Number of elements ",size(mesh.t,2))
-    println("Number of Inside elements ",length(mesh.InsideElements))
-    println("Number of nodes ",size(mesh.p,2))
-    println("Number of Inside nodes ",length(mesh.InsideNodes))
-    println("Number of surface elements ",size(mesh.surfaceT,2))
-    println("Bounding shell: ",shell_id)
-
-    # viewMesh(mesh)
-    # return
-    # ------------------------------------------
-
-    # Volume of elements of each mesh node | Needed for the demagnetizing field
-    Vn::Vector{Float64} = zeros(mesh.nv)
-
-    # Integral of basis function over the domain | Needed for the exchange field
-    nodeVolume::Vector{Float64} = zeros(mesh.nv)
-    
-    for ik in 1:mesh.nInside
-        k = mesh.InsideElements[ik]
-        Vn[mesh.t[:,k]]         .+= mesh.VE[k]
-        nodeVolume[mesh.t[:,k]] .+= mesh.VE[k]/4
-    end
-    Vn = Vn[mesh.InsideNodes]
-    nodeVolume = nodeVolume[mesh.InsideNodes]
-
-    # Stiffness matrix | for the demagnetizing field
-    AD = stiffnessMatrix(mesh)
-
-    # Stiffness matrix, with only the internal mesh elements | for the exchange field
-    Ak::Matrix{Float64} = zeros(4*4,mesh.nt)
-    A = spzeros(mesh.nv,mesh.nv)
-    begin # Make a local scope to keep the workspace clean
+    # -- Finite element preliminaries --
         
-        b::Vector{Float64} = zeros(4)
-        c::Vector{Float64} = zeros(4)
-        d::Vector{Float64} = zeros(4)
-        aux::Matrix{Float64} = zeros(4,4)
-            
-        # Only go through the magnetic elements
+        # Volume of elements of each mesh node | Needed for the demagnetizing field
+        Vn::Vector{Float64} = zeros(mesh.nv)
+
+        # Integral of basis function over the domain | Needed for the exchange field
+        nodeVolume::Vector{Float64} = zeros(mesh.nv)
+        
         for ik in 1:mesh.nInside
             k = mesh.InsideElements[ik]
+            Vn[mesh.t[:,k]]         .+= mesh.VE[k]
+            nodeVolume[mesh.t[:,k]] .+= mesh.VE[k]/4
+        end
+        Vn = Vn[mesh.InsideNodes]
+        nodeVolume = nodeVolume[mesh.InsideNodes]
+
+        # Stiffness matrix | for the demagnetizing field
+        AD = stiffnessMatrix(mesh)
+
+        # Stiffness matrix, with only the internal mesh elements | for the exchange field
+        A = spzeros(mesh.nv,mesh.nv)
+        begin # Make a local scope to keep the workspace clean
+            
+            Ak::Matrix{Float64} = zeros(4*4,mesh.nt)
+            b::Vector{Float64} = zeros(4)
+            c::Vector{Float64} = zeros(4)
+            d::Vector{Float64} = zeros(4)
+            aux::Matrix{Float64} = zeros(4,4)
+                
+            # Only go through the magnetic elements
+            for ik in 1:mesh.nInside
+                k = mesh.InsideElements[ik]
+                for i in 1:4
+                    _,b[i],c[i],d[i] = abcd(mesh.p,mesh.t[:,k],mesh.t[i,k])
+                end
+                aux = mesh.VE[k]*(b*b' + c*c' + d*d')
+                Ak[:,k] = aux[:] # vec(aux)
+            end
+
+            # Update sparse global matrix
+            n = 0
             for i in 1:4
-                _,b[i],c[i],d[i] = abcd(mesh.p,mesh.t[:,k],mesh.t[i,k])
+                for j in 1:4
+                    n += 1
+                    A += sparse(Int.(mesh.t[i,:]),Int.(mesh.t[j,:]),Ak[n,:],mesh.nv,mesh.nv)
+                end
             end
-            aux = mesh.VE[k]*(b*b' + c*c' + d*d')
-            Ak[:,k] = aux[:] # vec(aux)
+
+            # Remove all exterior nodes
+            A = A[mesh.InsideNodes,mesh.InsideNodes]
+        end # Local scope to calculate the stiffness matrix of the exchange field
+
+        # Dirichlet boundary condition
+        fixed::Vector{Int32} = findNodes(mesh,"face",mesh.shell_id)
+        free::Vector{Int32} = setdiff(1:mesh.nv,fixed)
+    # -----------------------------------
+
+    # -- Magnetic fields --
+        
+        Heff::Matrix{Float64} = zeros(3,mesh.nInsideNodes) .+ mu0*Hap
+        
+        # Demagnetizing field
+        Hd::Matrix{Float64} = demagField(mesh,fixed,free,AD,m)
+
+        # Exchange field (T)
+        Hexc::Matrix{Float64} = -2*Aexc.* (A*m[:,mesh.InsideNodes]')'
+
+        # Anisotropy field (T)
+        Han::Matrix{Float64} = zeros(3,mesh.nInsideNodes)
+        for i in 1:mesh.nInsideNodes
+            nd = mesh.InsideNodes[i]
+            Han[:,i] = 2*Aan/Ms*dot(m[:,nd],uan).*uan
+        end
+        
+        # Convert to proper unis
+        @simd for i in 1:3
+            Hd[i,:]     .*= mu0*Ms./Vn
+            Hexc[i,:]   ./= Ms*scl^2 .*nodeVolume
         end
 
-        # Update sparse global matrix
-        n = 0
-        for i in 1:4
-            for j in 1:4
-                n += 1
-                A += sparse(Int.(mesh.t[i,:]),Int.(mesh.t[j,:]),Ak[n,:],mesh.nv,mesh.nv)
-            end
+        # Effective field
+        Heff += Hd + Hexc + Han
+
+        # H = Heff + damp* m cross Heff
+        H::Matrix{Float64} = zeros(3,mesh.nInsideNodes)
+        for i in 1:mesh.nInsideNodes
+            nd = mesh.InsideNodes[i]
+            H[:,i] = Heff[:,i] + damp.*cross(m[:,nd],Heff[:,i])
         end
 
-        # Remove all exterior nodes
-        A = A[mesh.InsideNodes,mesh.InsideNodes]
-    end # Local scope to calculate the stiffness matrix of the exchange field
-
-    # Dirichlet boundary condition
-    fixed::Vector{Int32} = findNodes(mesh,"face",shell_id)
-    free::Vector{Int32} = setdiff(1:mesh.nv,fixed)
-    # ------------------------------------------
-
-    # Magnetization field
-    m::Matrix{Float64} = zeros(3,mesh.nv)
-    m[1,mesh.InsideNodes] .= 1
-    # for i in mesh.InsideNodes
-        # m[1,i] = 1
-    # end
-
-    # Magnetic fields
-    Heff::Matrix{Float64} = zeros(3,mesh.nInsideNodes) .+ mu0*Hap
-    
-    # Demagnetizing field
-    Hd::Matrix{Float64} = demagField(mesh,fixed,free,AD,m)
-
-    # Exchange field (T)
-    Hexc::Matrix{Float64} = -2*Aexc.* (A*m[:,mesh.InsideNodes]')'
-
-    # Anisotropy field (T)
-    Han::Matrix{Float64} = zeros(3,mesh.nInsideNodes)
-    for i in 1:mesh.nInsideNodes
-        nd = mesh.InsideNodes[i]
-        Han[:,i] = 2*Aan/Ms*dot(m[:,nd],uan).*uan
-    end
-    
-    # Convert to proper unis
-    @simd for i in 1:3
-        Hd[i,:]     .*= mu0*Ms./Vn
-        Hexc[i,:]   ./= Ms*scl^2 .*nodeVolume
-    end
-
-    # Effective field
-    Heff += Hd + Hexc + Han
-
-    # H = Heff + damp* m cross Heff
-    H::Matrix{Float64} = zeros(3,mesh.nInsideNodes)
-    for i in 1:mesh.nInsideNodes
-        nd = mesh.InsideNodes[i]
-        H[:,i] = Heff[:,i] + damp.*cross(m[:,nd],Heff[:,i])
-    end
-
-    # Time step
-    # ------------------------------------------
+    # -- Time step --
 
     # Average magnetization over time
     M_avg::Matrix{Float64} = zeros(3,maxAtt)
@@ -269,15 +179,19 @@ function main()
 
     Hold::Matrix{Float64} = deepcopy(H)
     
-    t::Float64 = 0  # Time (s)
-    it::Int32 = 0   # Iteration step
-    @time while 1e9*t < totalTime && it < maxAtt
+    div::Float64 = maxTorque + 1    # |dm/dt| = torque. div < maxTorque ? return : continue
+    it::Int32 = 0                   # Iteration step
+    
+    t::Float64 = 0.0 # Time
+    
+    while 1e9 *t < totalTime # in nanoseconds
         t += dt
         it += 1
         
+        # Print current simulation time every N iteration steps
         if mod(it,50) < 1
-            println("t (ns): ",t*1e9)
-        end  
+            println("Relaxing for (ns): ",it*(dt*1e9),"; <|dm/dt|>: ",div)
+        end
 
         # New magnetization
         for i in 1:mesh.nInsideNodes
@@ -286,36 +200,37 @@ function main()
         end
 
         # New magnetic field
-        Heff = zeros(3,mesh.nInsideNodes) .+ mu0*Hap
-        
-        # Demagnetizing field
-        Hd = demagField(mesh,fixed,free,AD,m)
+            Heff = zeros(3,mesh.nInsideNodes) .+ mu0*Hap
+            
+            # Demagnetizing field
+            Hd = demagField(mesh,fixed,free,AD,m)
 
-        # Exchange field (T)
-        Hexc = -2*Aexc.* (A*m[:,mesh.InsideNodes]')'
+            # Exchange field (T)
+            Hexc = -2*Aexc.* (A*m[:,mesh.InsideNodes]')'
 
-        # Anisotropy field (T)
-        Han = zeros(3,mesh.nInsideNodes)
-        for i in 1:mesh.nInsideNodes
-            nd = mesh.InsideNodes[i]
-            Han[:,i] = 2*Aan/Ms*dot(m[:,nd],uan).*uan
-        end
-        
-        # Convert to proper unis
-        @simd for i in 1:3
-            Hd[i,:]     .*= mu0*Ms./Vn
-            Hexc[i,:]   ./= Ms*scl^2 .*nodeVolume
-        end
+            # Anisotropy field (T)
+            Han = zeros(3,mesh.nInsideNodes)
+            for i in 1:mesh.nInsideNodes
+                nd = mesh.InsideNodes[i]
+                Han[:,i] = 2*Aan/Ms*dot(m[:,nd],uan).*uan
+            end
+            
+            # Convert to proper unis
+            @simd for i in 1:3
+                Hd[i,:]     .*= mu0*Ms./Vn
+                Hexc[i,:]   ./= Ms*scl^2 .*nodeVolume
+            end
 
-        # Effective field
-        Heff += Hd + Hexc + Han
+            # Effective field
+            Heff += Hd + Hexc + Han
 
-        # H = Heff + damp* m cross Heff
-        H = zeros(3,mesh.nInsideNodes)
-        for i in 1:mesh.nInsideNodes
-            nd = mesh.InsideNodes[i]
-            H[:,i] = Heff[:,i] + damp.*cross(m[:,nd],Heff[:,i])
-        end
+            # H = Heff + damp* m cross Heff
+            H = zeros(3,mesh.nInsideNodes)
+            for i in 1:mesh.nInsideNodes
+                nd = mesh.InsideNodes[i]
+                H[:,i] = Heff[:,i] + damp.*cross(m[:,nd],Heff[:,i])
+            end
+        # ------
 
         # Store last magnetic field
         Hold = deepcopy(H)
@@ -337,7 +252,7 @@ function main()
         E_time[it] = E # Store the energy for each time step
 
         # Average torque
-        dtau::Float64 = 0
+        dtau = 0
         for i = 1:mesh.nInsideNodes
             dtau += norm(cross(m[:,mesh.InsideNodes[i]],Heff[:,i]))
         end
@@ -346,6 +261,16 @@ function main()
         # Average magnetization
         M_avg[:,it] = mean(m[:,mesh.InsideNodes],2)
 
+        div = torque_time[it]
+        
+        # Quit solver early if totalTime == Inf
+        if totalTime == Inf && div < maxTorque || it+1 > maxAtt
+            println("Returning from time iteration loop")
+            break # Exit time iteration loop
+        # Else
+            # Keep going until t >= totalTime
+        end 
+
     end # End of time iteration
 
     # Remove excess zeros
@@ -353,20 +278,8 @@ function main()
     E_time      = E_time[1:it]
     torque_time = torque_time[1:it]
 
-    time::Vector{Float64} = 1e9*dt .*(1:it)
+    time::Vector{Float64} = (1e9*dt).*(1:it)
 
-    fig = Figure()
-    ax = Axis(  fig[1,1], 
-                xlabel = "Time (ns)", 
-                ylabel = "<M> (kA/m)",
-                title = "Micromagnetic simulation")
+    return m, Heff, time, M_avg, E_time, torque_time, Hd, Hexc, Han, E, Ed, Eexc, Ean
+end # Landau-Lifshitz equation solver
 
-    scatter!(ax,time,Ms/1000 .*M_avg[1,:], label = "M_x")
-    # scatter!(ax,time,Ms/1000 .*M_avg[2,:], label = "M_y")
-    # scatter!(ax,time,Ms/1000 .*M_avg[3,:], label = "M_z")
-    axislegend() # position = :rt
-
-    wait(display(fig))
-end
-
-main()
