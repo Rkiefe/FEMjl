@@ -13,6 +13,10 @@ include("../FEMjl.jl")
 
 # For plots
 using GLMakie
+
+# For testing with matlab mesh
+using DelimitedFiles
+
 # ------------------------------------------
 
 # Find new magnetization after time iteration
@@ -24,7 +28,7 @@ function timeStep(m,H,Hold,Heff,dt,giro,damp::Float64=1,precession::Bool=true)
     d = dt*giro/2
 
     # The new magnetization after the time step
-    m2::Vector = zeros(3)
+    m2::Vector{Float64} = zeros(3)
 
     # Initial guess of the new magnetic field
     H12 = 3/2 *H - 0.5 *Hold
@@ -54,7 +58,7 @@ function timeStep(m,H,Hold,Heff,dt,giro,damp::Float64=1,precession::Bool=true)
         err = maximum(abs.(m2-aux))
         # println(err)
 
-        aux = m2
+        aux = deepcopy(m2)
         if att > 100
             println("Time step did not converge in ",att," steps")
             break
@@ -66,8 +70,8 @@ end # Find new magnetization after time iteration
 
 # ------------------------------------------
 function main()
-    meshSize::Float64 = 200
-    localSize::Float64 = 5
+    meshSize::Float64 = 20
+    localSize::Float64 = 0
 
     # Constants
     mu0::Float64 = pi*4e-7          # vacuum magnetic permeability
@@ -119,7 +123,7 @@ function main()
     container = fragments[1][1][2]
 
     # Generate Mesh
-    mesh = Mesh(cells,meshSize,localSize,true)
+    mesh = Mesh(cells,meshSize,localSize,false)
     
     # Get bounding shell surface id
     shell_id = gmsh.model.getAdjacencies(3, container)[2]
@@ -127,8 +131,21 @@ function main()
     # Must remove the surface Id of the interior surfaces
     shell_id = shell_id[bounding_shell_n_surfaces] # All other, are interior surfaces
 
+
     # Finalize Gmsh and show mesh properties
+    # gmsh.fltk.run()
     gmsh.finalize()
+
+    # Load mesh from matlab
+    # mesh = MESH()
+    # mesh.t = readdlm("mesh/t.txt",','); mesh.nt = size(mesh.t,2)
+    # mesh.p = readdlm("mesh/p.txt",','); mesh.nv = size(mesh.p,2)
+    # mesh.surfaceT = readdlm("mesh/surfaceT.txt",','); mesh.ne = size(mesh.surfaceT,2)
+    # mesh.InsideElements = vec(readdlm("mesh/InsideElements.txt",',')); mesh.nInside = length(mesh.InsideElements)
+    # mesh.InsideNodes = vec(readdlm("mesh/InsideNodes.txt",',')); mesh.nInsideNodes = length(mesh.InsideNodes)
+    # mesh.VE = vec(readdlm("mesh/VE.txt",','))
+    # shell_id = [1] 
+
     println("Number of elements ",size(mesh.t,2))
     println("Number of Inside elements ",length(mesh.InsideElements))
     println("Number of nodes ",size(mesh.p,2))
@@ -254,7 +271,7 @@ function main()
     
     t::Float64 = 0  # Time (s)
     it::Int32 = 0   # Iteration step
-    @time while 1e9*t < totalTime
+    @time while 1e9*t < totalTime && it < maxAtt
         t += dt
         it += 1
         
