@@ -32,7 +32,7 @@ function timeStep(m::Vector{Float64},H::Vector{Float64},Hold::Vector{Float64},He
     d = dt*giro/2
 
     # The new magnetization after the time step
-    m2::Vector = zeros(3)
+    m2::Vector{Float64} = zeros(3)
 
     # Initial guess of the new magnetic field
     H12 = 3/2 *H - 0.5 *Hold
@@ -62,8 +62,8 @@ function timeStep(m::Vector{Float64},H::Vector{Float64},Hold::Vector{Float64},He
         err = maximum(abs.(m2-aux))
         # println(err)
 
-        aux = m2
-        if att > 100
+        aux = deepcopy(m2)
+        if att > 1_000
             println("Time step did not converge in ",att," steps")
             break
         end
@@ -85,7 +85,7 @@ function nextM(M::Vector{Float64},Heff::Vector{Float64},dt::Float64)
     Mnew = mat\(M-d*cross(M,h12))
 
     return Mnew, M
-end # New magnetization with steepestDescent
+end # New magnetization with steepest descent
 
 
 function relax(mesh, scl::Float64, m::Matrix{Float64}, Ms::Float64, Aexc::Float64, Aan::Float64, uan::Vector{Float64}, Hap::Vector{Float64}, dt::Float64, maxTorque::Float64 ,giro::Float64, damp::Float64=1, precession::Bool=true, maxAtt::Int32=10_000)
@@ -201,7 +201,7 @@ function relax(mesh, scl::Float64, m::Matrix{Float64}, Ms::Float64, Aexc::Float6
     E_time::Vector{Float64} = zeros(maxAtt)
     torque_time::Vector{Float64} = zeros(maxAtt)
 
-    Hold::Matrix{Float64} = H
+    Hold::Matrix{Float64} = deepcopy(H)
     
     div::Float64 = maxTorque + 1
     it::Int32 = 0       # Iteration step
@@ -252,7 +252,7 @@ function relax(mesh, scl::Float64, m::Matrix{Float64}, Ms::Float64, Aexc::Float6
         end
 
         # Store last magnetic field
-        Hold = H
+        Hold = deepcopy(H)
 
         # Energy density
         Eext = 0
@@ -280,12 +280,6 @@ function relax(mesh, scl::Float64, m::Matrix{Float64}, Ms::Float64, Aexc::Float6
         # Average magnetization
         M_avg[:,it] = mean(m[:,mesh.InsideNodes],2)
 
-        # Check stability by evaluating the torque term
-        div = torque_time[it]
-        if torque_time[it] < maxTorque
-            println("Torque is small, exiting relax()")
-        end
-
     end # End of time iteration
 
     # Remove excess zeros
@@ -307,6 +301,7 @@ function steepestDescent(mesh, scl::Float64, m::Matrix{Float64}, Ms::Float64, Ae
 
     # Finite element preliminaries
     # ------------------------------------------
+    
     # Volume of elements of each mesh node | Needed for the demagnetizing field
     Vn::Vector{Float64} = zeros(mesh.nv)
 
@@ -362,7 +357,6 @@ function steepestDescent(mesh, scl::Float64, m::Matrix{Float64}, Ms::Float64, Ae
     free::Vector{Int32} = setdiff(1:mesh.nv,fixed)
     # ------------------------------------------
 
-
     # Magnetic fields
     Heff::Matrix{Float64} = zeros(3,mesh.nInsideNodes) .+ mu0*Hap
     
@@ -399,7 +393,7 @@ function steepestDescent(mesh, scl::Float64, m::Matrix{Float64}, Ms::Float64, Ae
     mOld::Matrix{Float64} = deepcopy(m)
     for i in 1:mesh.nInsideNodes
         nd = mesh.InsideNodes[i]
-        m[:,nd] = timeStep(m[:,nd],H[:,i],H[:,i],Heff[:,i],0.01,1.0,1.0,false)
+        m[:,nd] = timeStep(mOld[:,nd],H[:,i],H[:,i],Heff[:,i],0.03,1.0,1.0,false)
     end
 
     # ------------------------------------------
@@ -426,8 +420,8 @@ function steepestDescent(mesh, scl::Float64, m::Matrix{Float64}, Ms::Float64, Ae
         end
 
         # Store previous magnetic field
-        HeffOld::Matrix{Float64} = Heff
-        Hold::Matrix{Float64} = H
+        HeffOld::Matrix{Float64} = deepcopy(Heff)
+        Hold::Matrix{Float64} = deepcopy(H)
 
         # New magnetic field
         Heff = zeros(3,mesh.nInsideNodes) .+ mu0*Hap
@@ -547,180 +541,128 @@ end # End of steepestDescent
     uncomment the main() and edit there
 =#
 
-# function main()
-#     meshSize::Float64 = 1000
-#     localSize::Float64 = 5
+function main()
+    meshSize::Float64 = 1000
+    localSize::Float64 = 5
 
-#     # Constants
-#     mu0::Float64 = pi*4e-7          # vacuum magnetic permeability
-#     giro::Float64 = 2.210173e5 /mu0 # Gyromagnetic ratio (rad T-1 s-1)
-#     dt::Float64 = 0.028/giro        # Time step in reduced units (seconds per gyro)
+    # Constants
+    mu0::Float64 = pi*4e-7          # vacuum magnetic permeability
+    giro::Float64 = 2.210173e5 /mu0 # Gyromagnetic ratio (rad T-1 s-1)
+    dt::Float64 = 0.028/giro        # Time step in reduced units (seconds per gyro)
     
-#     maxTorque::Float64 = 1e-3       # Stop criteria of the relax function
+    maxTorque::Float64 = 0       # Stop criteria of the relax function
 
-#     damp::Float64 = 1             # Damping parameter (dimensionless [0,1])
-#     precession::Bool = false         # Include precession or not
+    damp::Float64 = 1             # Damping parameter (dimensionless [0,1])
+    precession::Bool = false         # Include precession or not
 
-#     # Dimension of the magnetic material (rectangle)
-#     L::Vector{Float64} = 
-#         [512,128,30]
-#         # [100,100,5]
+    # Dimension of the magnetic material (rectangle)
+    L::Vector{Float64} = 
+        [512,128,30]
+        # [100,100,5]
     
-#     scl::Float64 = 1e-9                 # scale of the geometry | (m -> nm)
+    scl::Float64 = 1e-9                 # scale of the geometry | (m -> nm)
 
-#     # Conditions
-#     Ms::Float64   = 860e3               # Magnetic saturation (A/m)
-#     Aexc::Float64 = 13e-12              # Exchange   (J/m)
-#     Aan::Float64  = 0.0                 # Anisotropy (J/m3)
-#     uan::Vector{Float64}  = [1,0,0]     # easy axis direction
-#     Hap::Vector{Float64}  = [800e3,0,0] # A/m
+    # Conditions
+    Ms::Float64   = 860e3               # Magnetic saturation (A/m)
+    Aexc::Float64 = 13e-12              # Exchange   (J/m)
+    Aan::Float64  = 0.0                 # Anisotropy (J/m3)
+    uan::Vector{Float64}  = [1,0,0]     # easy axis direction
+    Hap::Vector{Float64}  = [800e3,0,0] # A/m
 
-#     # Convergence criteria
-#     maxAtt::Int32 = 4_000         # max number of iterations for the LL solver
+    # Convergence criteria
+    maxAtt::Int32 = 2         # max number of iterations for the LL solver
 
-#     # Create a geometry
-#     # ------------------------------------------
-#     gmsh.initialize()
+    # Create a geometry
+    # ------------------------------------------
+    gmsh.initialize()
 
-#     # >> Model
-#     # Create an empty container
-#     container = addSphere([0,0,0],5*maximum(L))
-#     cells = [] # List of cells inside the container
+    # >> Model
+    # Create an empty container
+    container = addSphere([0,0,0],5*maximum(L))
+    cells = [] # List of cells inside the container
 
-#     # Get how many surfaces compose the bounding shell
-#     temp = gmsh.model.getEntities(2)                # Get all surfaces of current model
-#     bounding_shell_n_surfaces = 1:length(temp)      # Get the number of surfaces in the bounding shell
+    # Get how many surfaces compose the bounding shell
+    temp = gmsh.model.getEntities(2)                # Get all surfaces of current model
+    bounding_shell_n_surfaces = 1:length(temp)      # Get the number of surfaces in the bounding shell
 
-#     # Add another object inside the container
-#     addCuboid([0,0,0],L,cells,true)
+    # Add another object inside the container
+    addCuboid([0,0,0],L,cells,true)
 
-#     # Fragment to make a unified geometry
-#     _, fragments = gmsh.model.occ.fragment([(3, container)], cells)
-#     gmsh.model.occ.synchronize()
+    # Fragment to make a unified geometry
+    _, fragments = gmsh.model.occ.fragment([(3, container)], cells)
+    gmsh.model.occ.synchronize()
 
-#     # Update container volume ID
-#     container = fragments[1][1][2]
+    # Update container volume ID
+    container = fragments[1][1][2]
 
-#     # Generate Mesh
-#     mesh = Mesh(cells,meshSize,localSize,false)
+    # Generate Mesh
+    mesh = Mesh(cells,meshSize,localSize,true)
     
-#     # Get bounding shell surface id
-#     mesh.shell_id = gmsh.model.getAdjacencies(3, container)[2]
+    # Get bounding shell surface id
+    mesh.shell_id = gmsh.model.getAdjacencies(3, container)[2]
 
-#     # Must remove the surface Id of the interior surfaces
-#     mesh.shell_id = mesh.shell_id[bounding_shell_n_surfaces] # All other, are interior surfaces
+    # Must remove the surface Id of the interior surfaces
+    mesh.shell_id = mesh.shell_id[bounding_shell_n_surfaces] # All other, are interior surfaces
 
-#     # Finalize Gmsh and show mesh properties
-#     gmsh.finalize()
-#     println("Number of elements ",size(mesh.t,2))
-#     println("Number of Inside elements ",length(mesh.InsideElements))
-#     println("Number of nodes ",size(mesh.p,2))
-#     println("Number of Inside nodes ",length(mesh.InsideNodes))
-#     println("Number of surface elements ",size(mesh.surfaceT,2))
-#     # ------------------------------------------
+    # Finalize Gmsh and show mesh properties
+    gmsh.finalize()
+    println("Number of elements ",size(mesh.t,2))
+    println("Number of Inside elements ",length(mesh.InsideElements))
+    println("Number of nodes ",size(mesh.p,2))
+    println("Number of Inside nodes ",length(mesh.InsideNodes))
+    println("Number of surface elements ",size(mesh.surfaceT,2))
+    # ------------------------------------------
 
-#     # Volume of elements of each mesh node | Needed for the demagnetizing field
-#     Vn::Vector{Float64} = zeros(mesh.nv)
-
-#     # Integral of basis function over the domain | Needed for the exchange field
-#     nodeVolume::Vector{Float64} = zeros(mesh.nv)
+    # Magnetization field
+    m::Matrix{Float64} = zeros(3,mesh.nv)
+    m[1,:] .= 1
+    # begin # Set the initial magnetization
+    #     theta::Vector{Float64} = 2*pi*rand(mesh.nInsideNodes)
+    #     phi::Vector{Float64} = pi*rand(mesh.nInsideNodes)
+    #     for i = 1:mesh.nInsideNodes
+    #         nd = mesh.InsideNodes[i]
+    #         m[:,i] = [sin(phi[i])*cos(theta[i]),sin(phi[i])*sin(theta[i]),cos(phi[i])]
+    #     end
+    # end
     
-#     for ik in 1:mesh.nInside
-#         k = mesh.InsideElements[ik]
-#         Vn[mesh.t[:,k]]         .+= mesh.VE[k]
-#         nodeVolume[mesh.t[:,k]] .+= mesh.VE[k]/4
-#     end
-#     Vn = Vn[mesh.InsideNodes]
-#     nodeVolume = nodeVolume[mesh.InsideNodes]
+    # Landau-Lifhitz equation
+    # m, Heff, time, M_avg, E_time, torque_time, 
+    # Hd, Hexc, Han, E, Ed, Eexc, Ean = relax(mesh,scl,m,Ms,Aexc,Aan,uan,Hap,dt,maxTorque,giro,damp,precession,maxAtt)
 
-#     # Stiffness matrix | for the demagnetizing field
-#     AD = stiffnessMatrix(mesh)
-
-#     # Stiffness matrix, with only the internal mesh elements | for the exchange field
-#     Ak::Matrix{Float64} = zeros(4*4,mesh.nt)
-#     A = spzeros(mesh.nv,mesh.nv)
-#     begin # Make a local scope to keep the workspace clean
-        
-#         b::Vector{Float64} = zeros(4)
-#         c::Vector{Float64} = zeros(4)
-#         d::Vector{Float64} = zeros(4)
-#         aux::Matrix{Float64} = zeros(4,4)
-            
-#         # Only go through the magnetic elements
-#         for ik in 1:mesh.nInside
-#             k = mesh.InsideElements[ik]
-#             for i in 1:4
-#                 _,b[i],c[i],d[i] = abcd(mesh.p,mesh.t[:,k],mesh.t[i,k])
-#             end
-#             aux = mesh.VE[k]*(b*b' + c*c' + d*d')
-#             Ak[:,k] = aux[:] # vec(aux)
-#         end
-
-#         # Update sparse global matrix
-#         n = 0
-#         for i in 1:4
-#             for j in 1:4
-#                 n += 1
-#                 A += sparse(Int.(mesh.t[i,:]),Int.(mesh.t[j,:]),Ak[n,:],mesh.nv,mesh.nv)
-#             end
-#         end
-
-#         # Remove all exterior nodes
-#         A = A[mesh.InsideNodes,mesh.InsideNodes]
-#     end # Local scope to calculate the stiffness matrix of the exchange field
-
-#     # Dirichlet boundary condition
-#     fixed::Vector{Int32} = findNodes(mesh,"face",mesh.shell_id)
-#     free::Vector{Int32} = setdiff(1:mesh.nv,fixed)
-#     # ------------------------------------------
-
-#     # Magnetization field
-#     m::Matrix{Float64} = zeros(3,mesh.nv)
-#     # m[1,:] .= 1
-#     begin # Set the initial magnetization
-#         theta::Vector{Float64} = 2*pi*rand(mesh.nInsideNodes)
-#         phi::Vector{Float64} = pi*rand(mesh.nInsideNodes)
-#         for i = 1:mesh.nInsideNodes
-#             nd = mesh.InsideNodes[i]
-#             m[:,i] = [sin(phi[i])*cos(theta[i]),sin(phi[i])*sin(theta[i]),cos(phi[i])]
-#         end
-#     end
+    # Steepest descent energy minimization
+    m, Heff, M_avg, E_time, torque_time,
+    Hd, Hexc, Han, E, Ed, Eexc, Ean = steepestDescent(mesh,scl,m,Ms,Aexc,Aan,uan,Hap,maxTorque,giro,maxAtt)
     
-#     # Landau-Lifhitz equation
-#     # m, Heff, time, M_avg, E_time, torque_time, 
-#     # Hd, Hexc, Han, E, Ed, Eexc, Ean = relax(mesh,scl,m,Ms,Aexc,Aan,uan,Hap,dt,maxTorque,giro,damp,precession,maxAtt)
 
-#     # Steepest descent energy minimization
-#     m, Heff, M_avg, E_time, torque_time,
-#     Hd, Hexc, Han, E, Ed, Eexc, Ean = steepestDescent(mesh,scl,m,Ms,Aexc,Aan,uan,Hap,maxTorque,giro,maxAtt)
-    
-#     # Energy
-#     fig = Figure()
-#     ax = Axis(  fig[1,1], 
-#                 xlabel = "Time (ns)", 
-#                 ylabel = "Energy",
-#                 title = "")
-#     scatter!(ax,1:length(E_time),E_time) # E_time
+    save2file("m.txt",m)
 
-#     # Log of torque
-#     ax = Axis(  fig[1,2], 
-#                 xlabel = "Time (ns)", 
-#                 ylabel = "Log(Torque)",
-#                 title = "")
-#     scatter!(ax,1:length(torque_time),log10.(torque_time)) # E_time
+    # Energy
+    fig = Figure()
+    ax = Axis(  fig[1,1], 
+                xlabel = "Time (ns)", 
+                ylabel = "Energy",
+                title = "")
+    scatter!(ax,1:length(E_time),E_time) # E_time
 
-#     # Magnetization
-#     ax = Axis(  fig[1,3], 
-#                 xlabel = "Time (ns)", 
-#                 ylabel = "<M> (kA/m)",
-#                 title = "Average Magnetization")
+    # Log of torque
+    ax = Axis(  fig[1,2], 
+                xlabel = "Time (ns)", 
+                ylabel = "Log(Torque)",
+                title = "")
+    scatter!(ax,1:length(torque_time),log10.(torque_time)) # E_time
 
-#     scatter!(ax,1:size(M_avg,2),Ms/1000 .*M_avg[1,:], label = "M_x")
-#     scatter!(ax,1:size(M_avg,2),Ms/1000 .*M_avg[2,:], label = "M_y")
-#     scatter!(ax,1:size(M_avg,2),Ms/1000 .*M_avg[3,:], label = "M_z")
-#     axislegend() # position = :rt
+    # Magnetization
+    ax = Axis(  fig[1,3], 
+                xlabel = "Time (ns)", 
+                ylabel = "<M> (kA/m)",
+                title = "Average Magnetization")
 
-#     wait(display(fig))
-# end
+    scatter!(ax,1:size(M_avg,2),Ms/1000 .*M_avg[1,:], label = "M_x")
+    scatter!(ax,1:size(M_avg,2),Ms/1000 .*M_avg[2,:], label = "M_y")
+    scatter!(ax,1:size(M_avg,2),Ms/1000 .*M_avg[3,:], label = "M_z")
+    axislegend() # position = :rt
 
-# main()
+    wait(display(fig))
+end
+
+main()
