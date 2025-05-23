@@ -254,10 +254,14 @@ function Mesh(cells,meshSize=0,localSize=0,saveMesh=false)
         gmsh.option.setNumber("Mesh.MeshSizeMax", meshSize)
     end
 
-    # Generate mesh
+    # -- Generate mesh --
     # gmsh.option.setNumber("Mesh.Algorithm",6)
     gmsh.model.mesh.generate(3)
-    gmsh.model.mesh.optimize("Netgen") # Optimize the mesh
+
+    # -- Optimize the mesh --
+        # "" (default), "NetGen", "HighOrder", 
+        # "Relocate3D", "HighOrderElastic", "UntangleMeshGeometry"
+    gmsh.model.mesh.optimize("UntangleMeshGeometry")
 
     # Get all tetrahedral elements (4 - tetrahedrons)
     t_tags, t = gmsh.model.mesh.getElementsByType(4)
