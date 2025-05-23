@@ -6,7 +6,7 @@
 # For plots
 using CairoMakie
 
-include("gmsh_wrapper.jl")
+include("../gmsh_wrapper.jl")
 include("SteepestDescent.jl")
 
 function main()
