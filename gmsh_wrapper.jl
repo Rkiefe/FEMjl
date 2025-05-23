@@ -36,10 +36,10 @@ function refineCell(cell,localSize,meshSize)
     gmsh.model.mesh.field.setNumber(threshold_field, "LcMin", localSize)
     gmsh.model.mesh.field.setNumber(threshold_field, "LcMax", meshSize)
     gmsh.model.mesh.field.setNumber(threshold_field, "DistMin", 0)
-    gmsh.model.mesh.field.setNumber(threshold_field, "DistMax", meshSize)   # Full refinement up to this distance
+    gmsh.model.mesh.field.setNumber(threshold_field, "DistMax", 10*localSize)   # Full refinement up to this distance
 
     # Adds a smoother element size transition (if set to 1)
-    gmsh.model.mesh.field.setNumber(threshold_field, "Sigmoid", 0) # 0 -> linear; 1 -> sigmoid
+    gmsh.model.mesh.field.setNumber(threshold_field, "Sigmoid", 1) # 0 -> linear; 1 -> sigmoid
 
     # Set this if you don't want to preserve the boundary shape
     # gmsh.option.setNumber("Mesh.MeshSizeExtendFromBoundary", 0) 
@@ -261,6 +261,7 @@ function Mesh(cells,meshSize=0,localSize=0,saveMesh=false)
     # -- Optimize the mesh --
         # "" (default), "NetGen", "HighOrder", 
         # "Relocate3D", "HighOrderElastic", "UntangleMeshGeometry"
+    # gmsh.model.mesh.optimize()
     gmsh.model.mesh.optimize("UntangleMeshGeometry")
 
     # Get all tetrahedral elements (4 - tetrahedrons)
